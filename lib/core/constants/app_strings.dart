@@ -1,0 +1,207 @@
+class AppStrings {
+  AppStrings._();
+
+  static const String appName = 'SmartQ Estates';
+  static const String welcomeTitle = 'WELCOME HOME';
+  static const String tagline = 'Your estate, in one place.';
+  static const String welcomeDescription =
+      'Manage visitors, services, maintenance, and payments seamlessly from one place.';
+  static const String getStarted = 'GET STARTED';
+  static const String continueText = 'CONTINUE';
+
+  // Estate Selection
+  static const String selectYourEstate = 'SELECT YOUR ESTATE';
+  static const String selectEstateSubtitle =
+      'Choose your residential community to access your estate portal.';
+  static const String searchEstatePlaceholder = 'Search estate by name or code...';
+  static const String noEstatesFound = 'No estates match your search';
+
+  // Main navigation tabs
+  static const String tabHome = 'HOME';
+  static const String tabActivity = 'ACTIVITY';
+  static const String tabAccount = 'ACCOUNT';
+
+  // Home Screen (Phase 2)
+  static const String greetingPrefix = 'GOOD MORNING';
+  static const String defaultResidentName = 'JOSHUA';
+  static const String primaryQuestion = 'WHAT DO YOU NEED?';
+
+  // 4 Primary Actions
+  static const String actionVisitors = 'VISITORS';
+  static const String actionServices = 'SERVICES';
+  static const String actionMaintenance = 'MAINTENANCE';
+  static const String actionPayments = 'PAYMENTS';
+
+  // Upcoming & Recent Activity Sections
+  static const String sectionUpcoming = 'UPCOMING';
+  static const String noUpcomingItems = 'NO UPCOMING ITEMS';
+  static const String upcomingEmptySubtitle =
+      'Scheduled visitors, deliveries, and service appointments will appear here.';
+
+  static const String sectionRecentActivity = 'RECENT ACTIVITY';
+  static const String noRecentActivity = 'NO RECENT ACTIVITY';
+  static const String recentActivityEmptySubtitle =
+      'Recent passes, service requests, and gate activity will show here.';
+
+  // Placeholder destination copy for Home actions
+  static const String visitorsComingSoon = 'Visitor features coming next.';
+  static const String servicesComingSoon = 'Estate services features coming soon.';
+  static const String maintenanceComingSoon = 'Maintenance requests features coming soon.';
+  static const String paymentsComingSoon = 'Estate payments and dues features coming soon.';
+
+  // Phase 3A - Visitors Home Screen
+  static const String visitorsTitle = 'VISITORS';
+  static const String visitorsSubtitle = 'MANAGE WHO COMES INTO YOUR ESTATE';
+
+  static const String actionInviteSomeone = 'INVITE SOMEONE';
+  static const String inviteSomeoneSubtitle = 'Create a pass for one visitor.';
+
+  static const String actionCreateEvent = 'CREATE EVENT';
+  static const String createEventSubtitle = 'Create access for multiple guests.';
+
+  static const String noUpcomingVisitors = 'NO UPCOMING VISITORS';
+  static const String upcomingVisitorsSubtitle = 'Visitors you invite will appear here.';
+
+  static const String sectionRecent = 'RECENT';
+  static const String noRecentVisits = 'NO RECENT VISITS';
+  static const String recentVisitsSubtitle = 'Your visitor history will appear here.';
+
+  // Phase 3B - Invite Someone Form
+  static const String inviteSomeoneHeader = 'INVITE SOMEONE';
+  static const String inviteSomeoneHeaderSubtitle = 'CREATE A VISITOR PASS';
+
+  static const String sectionWhoIsComing = 'WHO IS COMING?';
+  static const String labelFullName = 'FULL NAME';
+  static const String placeholderFullName = "Visitor's name";
+
+  static const String labelPhoneNumber = 'PHONE NUMBER';
+  static const String placeholderPhoneNumber = "Visitor's phone number";
+
+  static const String sectionWhenComing = 'WHEN ARE THEY COMING?';
+  static const String labelDate = 'DATE';
+  static const String labelArrivalTime = 'ARRIVAL TIME';
+
+  static const String sectionVehicle = 'VEHICLE';
+  static const String optionalBadge = 'OPTIONAL';
+  static const String labelPlateNumber = 'PLATE NUMBER';
+  static const String placeholderPlateNumber = 'Vehicle plate number';
+  static const String labelVehicleDescription = 'VEHICLE DESCRIPTION';
+  static const String placeholderVehicleDescription = 'e.g. Black Toyota Camry';
+
+  static const String createPassAction = 'CREATE PASS';
+
+  // Validation
+  static const String errorFullNameRequired = "Please enter the visitor's full name";
+  static const String errorPhoneRequired = "Please enter the visitor's phone number";
+  static const String errorPhoneInvalid = 'Please enter a valid phone number';
+  static const String errorDatePast = 'Arrival date cannot be in the past';
+
+  // Phase 3C - Visitor Pass Screen
+  static const String visitorPassHeader = 'VISITOR PASS';
+  static const String visitorPassExpected = 'THIS PERSON IS EXPECTED';
+  static const String labelVisitor = 'VISITOR';
+  static const String labelArrival = 'ARRIVAL';
+  static const String labelPass = 'PASS';
+  static const String labelExpires = 'EXPIRES';
+  static const String showCodeAtEntrance = 'SHOW THIS CODE AT THE ESTATE ENTRANCE';
+
+  static const String sharePassAction = 'SHARE PASS';
+  static const String cancelPassAction = 'CANCEL PASS';
+
+  // Cancel dialog
+  static const String cancelPassDialogTitle = 'CANCEL VISITOR PASS?';
+  static const String cancelPassDialogContent =
+      'This visitor will no longer be expected and the access code will be invalidated.';
+  static const String keepPassAction = 'KEEP PASS';
+  static const String confirmCancelAction = 'CANCEL PASS';
+
+  // Phase 4A - Create Event Form
+  static const String createEventHeader = 'CREATE EVENT';
+  static const String createEventHeaderSubtitle = 'MAKE ACCESS EASY FOR YOUR GUESTS';
+
+  static const String sectionWhatHosting = 'WHAT ARE YOU HOSTING?';
+  static const String labelEventName = 'EVENT NAME';
+  static const String placeholderEventName = "e.g. John's Birthday";
+
+  static const String sectionWhenIsIt = 'WHEN IS IT?';
+  static const String labelStartTime = 'START TIME';
+  static const String labelEndTime = 'END TIME';
+
+  static const String sectionHowManyGuests = 'HOW MANY GUESTS?';
+  static const String labelExpectedGuests = 'EXPECTED GUESTS';
+  static const String placeholderExpectedGuests = '1 – 500';
+
+  static const String createEventAction = 'CREATE EVENT';
+
+  // Phase 4A Validation
+  static const String errorEventNameRequired = 'Please enter the event name';
+  static const String errorEventDatePast = 'Event date cannot be in the past';
+  static const String errorEndTimeInvalid = 'End time must be after start time';
+  static const String errorGuestsInvalid = 'Expected guests must be between 1 and 500';
+
+  // Phase 4A Confirmation
+  static const String eventCreatedTitle = 'EVENT CREATED';
+  static const String eventCreatedNotice = 'Event access will be available in the next step.';
+  static const String labelGuests = 'GUESTS';
+  static const String doneAction = 'DONE';
+
+  // Phase 4B - Event Pass + QR Code
+  static const String eventPassTitle = 'EVENT PASS';
+  static const String labelEventCode = 'EVENT CODE';
+  static const String eventCodeExplanation = 'Guests can use this code at the estate entrance.';
+  static const String qrInstructionEvent = 'SHOW THIS CODE AT THE ESTATE ENTRANCE';
+  static const String shareEventAction = 'SHARE EVENT';
+  static const String cancelEventAction = 'CANCEL EVENT';
+  static const String cancelEventDialogTitle = 'CANCEL EVENT?';
+  static const String cancelEventDialogContent = 'Guests will no longer be expected for this event.';
+  static const String keepEventAction = 'KEEP EVENT';
+
+  // Phase 5A - Security Home
+  static const String securityTitle = 'SECURITY';
+  static const String verifyAccessAction = 'VERIFY ACCESS';
+  static const String verifyAccessSubtitle = 'Scan a visitor or event pass.';
+  static const String verifyAccessPlaceholderTitle = 'VERIFY ACCESS';
+  static const String verifyAccessPlaceholderSubtitle = 'SCANNER & PASS VERIFICATION';
+  static const String verifyAccessPlaceholderNotice =
+      'QR scanning and access verification will be built in the next phase.';
+  static const String sectionToday = 'TODAY';
+  static const String labelSecurityVisitors = 'VISITORS';
+  static const String labelSecurityEvents = 'EVENTS';
+  static const String noActivityStatus = 'NO ACTIVITY';
+  static const String recentActivitySubtitle = 'Access activity will appear here.';
+  static const String tabSecurity = 'SECURITY';
+  static const String tabSecurityAccount = 'ACCOUNT';
+  static const String securityAccountTitle = 'SECURITY ACCOUNT';
+  static const String securityAccountSubtitle = 'Officer profile and gate terminal';
+  static const String switchSecurityPortal = 'Security Gate Terminal';
+
+  // Phase 5B - Security QR Scanner & Decoded Result
+  static const String verifyAccessSubtitleScanner = 'SCAN A VISITOR OR EVENT PASS';
+  static const String scanQrCodeGuide = 'SCAN QR CODE';
+  static const String scanQrCodeInstruction = 'Put the QR code inside this area.';
+  static const String cameraAccessRequired = 'CAMERA ACCESS REQUIRED';
+  static const String cameraAccessRequiredSubtitle =
+      'Allow camera access to scan visitor and event passes.';
+  static const String grantPermissionAction = 'GRANT PERMISSION';
+  static const String cameraError = 'CAMERA ERROR';
+  static const String cameraUnavailableSubtitle = 'Camera is unavailable on this device.';
+  static const String qrCodeScannedTitle = 'QR CODE SCANNED';
+  static const String scanReceivedNotice = 'SCAN RECEIVED';
+  static const String unrecognizedQrTitle = 'UNRECOGNIZED QR';
+  static const String unrecognizedQrSubtitle = 'This QR code is not a SmartQ access pass.';
+  static const String scanAgainAction = 'SCAN AGAIN';
+  static const String labelRawPayload = 'RAW DATA';
+  static const String labelPassId = 'PASS IDENTIFIER';
+  static const String labelPassType = 'PASS TYPE';
+  static const String labelVerificationToken = 'SECURITY TOKEN';
+  static const String pendingVerificationNotice =
+      'Pass verification and access decision will occur in the next phase.';
+
+  // Placeholders
+  static const String homeToolsPlaceholder =
+      'Your estate tools and passes will appear here.';
+  static const String noActivityYet = 'NO ACTIVITY YET';
+  static const String activityEmptySubtitle =
+      'Your access logs, requests, and visitor entries will be tracked here.';
+  static const String residentAccount = 'RESIDENT ACCOUNT';
+}
