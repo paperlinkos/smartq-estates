@@ -1,9 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/models/decoded_qr_payload.dart';
+import '../../core/models/visitor_invitation.dart';
+import '../../core/models/visitor_pass.dart';
+import '../../core/repositories/pass_registry.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_card.dart';
@@ -13,14 +15,17 @@ class VerifyAccessScannerScreen extends StatefulWidget {
   const VerifyAccessScannerScreen({super.key});
 
   @override
-  State<VerifyAccessScannerScreen> createState() => _VerifyAccessScannerScreenState();
+  State<VerifyAccessScannerScreen> createState() =>
+      _VerifyAccessScannerScreenState();
 }
 
-class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> with WidgetsBindingObserver {
+class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen>
+    with WidgetsBindingObserver {
   late MobileScannerController _cameraController;
   bool _isDisposed = false;
   bool _hasNavigated = false;
   bool _isTorchOn = false;
+  MobileScannerException? _cameraError;
 
   @override
   void initState() {
@@ -36,10 +41,13 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_isDisposed || !mounted) return;
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       _cameraController.stop();
     } else if (state == AppLifecycleState.resumed) {
-      _cameraController.start();
+      if (_cameraError == null) {
+        _cameraController.start();
+      }
     }
   }
 
@@ -67,26 +75,28 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
     if (_hasNavigated || _isDisposed || !mounted) return;
     _hasNavigated = true;
 
-    // Immediately stop scanning to prevent duplicate scans
+    // Stop scanning to prevent duplicate scans
     _cameraController.stop();
 
     final payload = DecodedQrPayload.parse(rawValue);
 
-    // Phase 5C: Route to AccessResultScreen which runs full pass verification.
-    Navigator.of(context).pushNamed(
+    // Phase 5C: Route to AccessResultScreen which runs pass verification
+    Navigator.of(context)
+        .pushNamed(
       AppRouter.accessResult,
       arguments: payload,
-    ).then((_) {
-      // Upon returning to the scanner screen, reset navigation state and restart camera
+    )
+        .then((_) {
       if (mounted && !_isDisposed) {
         setState(() {
           _hasNavigated = false;
         });
-        _cameraController.start();
+        if (_cameraError == null) {
+          _cameraController.start();
+        }
       }
     });
   }
-
 
   Future<void> _toggleTorch() async {
     try {
@@ -99,79 +109,96 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
     } catch (_) {}
   }
 
+  void _retryCamera() {
+    setState(() {
+      _cameraError = null;
+    });
+    _cameraController.start();
+  }
+
+  void _simulateScan({required bool isValid}) {
+    final now = DateTime.now();
+    final passId = isValid ? 'VP-DEMO-VALID' : 'VP-DEMO-EXPIRED';
+    final token = isValid ? 'VT-DEMO-VALID-789' : 'VT-DEMO-EXPIRED-000';
+
+    final pass = VisitorPass(
+      passId: passId,
+      invitation: VisitorInvitation(
+        id: isValid ? 'INV-DEMO-VALID' : 'INV-DEMO-EXPIRED',
+        visitorName: isValid ? 'Sarah Jenkins' : 'Marcus Vance',
+        phoneNumber: '08012345678',
+        visitDate: now,
+        arrivalTime: TimeOfDay.now(),
+        vehiclePlate: 'ABC-123XY',
+        vehicleDescription: 'Silver Sedan',
+        createdAt: isValid
+            ? now.subtract(const Duration(hours: 1))
+            : now.subtract(const Duration(days: 2)),
+      ),
+      issuedAt: isValid
+          ? now.subtract(const Duration(hours: 1))
+          : now.subtract(const Duration(days: 2)),
+      expiresAt: isValid
+          ? now.add(const Duration(hours: 6))
+          : now.subtract(const Duration(hours: 1)),
+      verificationToken: token,
+      status: PassStatus.active,
+    );
+
+    LocalPassRegistry.instance.registerVisitorPass(pass);
+    _handleDecodedString(pass.toQrPayload());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasError = _cameraError != null;
+
     return Scaffold(
-      backgroundColor: AppColors.black,
+      backgroundColor: hasError ? AppColors.background : AppColors.black,
       appBar: AppHeader(
         title: AppStrings.verifyAccessAction,
         subtitle: AppStrings.verifyAccessSubtitleScanner,
         showBackButton: true,
         actions: [
-          IconButton(
-            onPressed: _toggleTorch,
-            icon: Icon(
-              _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-              color: AppColors.black,
-              size: 20,
+          if (!hasError) ...[
+            IconButton(
+              onPressed: _toggleTorch,
+              icon: Icon(
+                _isTorchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                color: AppColors.black,
+                size: 20,
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
+          ],
         ],
       ),
       body: SafeArea(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Camera Preview Layer
-            MobileScanner(
-              controller: _cameraController,
-              onDetect: _onDetect,
-              errorBuilder: (context, error) {
-                return _buildErrorState(error);
-              },
-            ),
-
-            // Scanning Viewfinder Overlay
-            _buildScannerOverlay(),
-
-            // Web or Testing Fallback Trigger (Allows simulated test scan)
-            if (kIsWeb)
-              Positioned(
-                bottom: 24,
-                left: 20,
-                right: 20,
-                child: AppCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_outline_rounded, size: 20, color: AppColors.black),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'Web Preview / Simulation Mode',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // Allow quick simulated scan on web
-                          _handleDecodedString(
-                            '{"passId":"BT-SIM01","type":"visitor","issuedAt":"2026-09-20T10:00:00Z","expiresAt":"2026-09-20T16:00:00Z","verificationToken":"VT-SIM-789","status":"active"}',
-                          );
-                        },
-                        child: const Text('SAMPLE SCAN'),
-                      ),
-                    ],
+        child: hasError
+            ? _buildErrorState(_cameraError!)
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Camera Preview Layer
+                  MobileScanner(
+                    controller: _cameraController,
+                    onDetect: _onDetect,
+                    errorBuilder: (context, error) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (mounted && _cameraError != error) {
+                          setState(() {
+                            _cameraError = error;
+                          });
+                        }
+                      });
+                      return const SizedBox.shrink();
+                    },
                   ),
-                ),
+
+                  // Scanning Viewfinder Overlay (ONLY shown when camera is active)
+                  _buildScannerOverlay(),
+                ],
               ),
-          ],
-        ),
       ),
     );
   }
@@ -179,7 +206,7 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
   Widget _buildScannerOverlay() {
     return Column(
       children: [
-        const SizedBox(height: 36),
+        const SizedBox(height: 24),
 
         // Scanning guidance label
         Container(
@@ -204,8 +231,8 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
         // Rectangular Viewfinder Frame
         Center(
           child: Container(
-            width: 260,
-            height: 260,
+            width: 250,
+            height: 250,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
@@ -215,7 +242,6 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
             ),
             child: Stack(
               children: [
-                // Minimal corner accents for high readability
                 Positioned(
                   top: 12,
                   left: 12,
@@ -297,67 +323,235 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
         ),
 
         const Spacer(),
-        const SizedBox(height: 60),
+
+        // Demo test trigger for physical camera view
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _simulateScan(isValid: true),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.white,
+                    side: const BorderSide(color: AppColors.white, width: 1.2),
+                    backgroundColor: Colors.black.withValues(alpha: 0.6),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'TEST VALID PASS',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => _simulateScan(isValid: false),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.white,
+                    side: BorderSide(
+                      color: AppColors.white.withValues(alpha: 0.6),
+                      width: 1.2,
+                    ),
+                    backgroundColor: Colors.black.withValues(alpha: 0.6),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'TEST EXPIRED PASS',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildErrorState(MobileScannerException error) {
-    final isPermissionError = error.errorCode == MobileScannerErrorCode.permissionDenied;
+    final isPermissionError =
+        error.errorCode == MobileScannerErrorCode.permissionDenied;
 
-    return Container(
-      color: AppColors.background,
-      padding: const EdgeInsets.all(24.0),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: AppColors.gray100,
-                borderRadius: BorderRadius.circular(16),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: 20),
+
+          // Camera icon badge
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.gray100,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.camera_alt_outlined,
+                size: 32,
+                color: AppColors.black,
               ),
-              child: const Center(
-                child: Icon(
-                  Icons.camera_alt_outlined,
-                  size: 32,
-                  color: AppColors.black,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Error title
+          Text(
+            isPermissionError
+                ? AppStrings.cameraAccessRequired
+                : AppStrings.cameraError,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Subtitle explanation
+          Text(
+            isPermissionError
+                ? AppStrings.cameraAccessRequiredSubtitle
+                : 'Camera is unavailable on this device (e.g. iOS Simulator). Use the simulation tools below to test the pass verification engine.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13.5,
+              height: 1.4,
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Retry camera button
+          AppButton(
+            text: isPermissionError
+                ? AppStrings.grantPermissionAction
+                : 'RETRY CAMERA',
+            onPressed: _retryCamera,
+          ),
+
+          const SizedBox(height: 32),
+
+          // Simulator / Showcase Demo Section
+          AppCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.tune_rounded, size: 18, color: AppColors.black),
+                    SizedBox(width: 8),
+                    Text(
+                      'SHOWCASE PASS SIMULATION',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Verify pass verification, security check-in, and access logging without physical camera hardware.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => _simulateScan(isValid: true),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.black,
+                      foregroundColor: AppColors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.check_circle_rounded,
+                            color: Colors.greenAccent, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'SIMULATE VALID PASS (ALLOWED)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => _simulateScan(isValid: false),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.black,
+                      side: const BorderSide(
+                          color: AppColors.border, width: 1.2),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.cancel_rounded,
+                            color: Colors.redAccent, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'SIMULATE EXPIRED PASS (DENIED)',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 20),
-            Text(
-              isPermissionError ? AppStrings.cameraAccessRequired : AppStrings.cameraError,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.5,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isPermissionError
-                  ? AppStrings.cameraAccessRequiredSubtitle
-                  : AppStrings.cameraUnavailableSubtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 13.5,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 24),
-            AppButton(
-              text: isPermissionError ? AppStrings.grantPermissionAction : 'RETRY CAMERA',
-              onPressed: () {
-                _cameraController.start();
-              },
-            ),
-          ],
-        ),
+          ),
+
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

@@ -984,6 +984,25 @@ void main() {
       expect(find.byType(SecurityHomeScreen), findsOneWidget);
     });
 
+    testWidgets('VerifyAccessScannerScreen provides showcase test buttons and navigates to AccessResultScreen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: const VerifyAccessScannerScreen(),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('TEST VALID PASS'), findsOneWidget);
+      expect(find.text('TEST EXPIRED PASS'), findsOneWidget);
+
+      await tester.tap(find.text('TEST VALID PASS'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AccessResultScreen), findsOneWidget);
+    });
+
     testWidgets('SecurityShellScreen bottom navigation switches between Security and Account tabs',
         (WidgetTester tester) async {
       await tester.pumpWidget(
