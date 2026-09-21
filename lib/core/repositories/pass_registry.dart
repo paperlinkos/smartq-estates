@@ -28,6 +28,12 @@ abstract class PassRegistry {
 
   /// Replaces the stored event pass record (used when status changes, e.g. cancellation).
   void updateEventPass(EventPass pass);
+
+  /// All registered visitor passes in memory.
+  List<VisitorPass> get allVisitorPasses;
+
+  /// All registered event passes in memory.
+  List<EventPass> get allEventPasses;
 }
 
 /// In-memory implementation of [PassRegistry] for the local prototype.
@@ -81,4 +87,10 @@ class LocalPassRegistry implements PassRegistry {
   void updateEventPass(EventPass pass) {
     _eventPasses[pass.passId] = pass;
   }
+
+  @override
+  List<VisitorPass> get allVisitorPasses => _visitorPasses.values.toList();
+
+  @override
+  List<EventPass> get allEventPasses => _eventPasses.values.toList();
 }

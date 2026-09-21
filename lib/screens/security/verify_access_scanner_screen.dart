@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/constants/app_colors.dart';
@@ -10,6 +11,7 @@ import '../../navigation/app_router.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/app_text_field.dart';
 
 class VerifyAccessScannerScreen extends StatefulWidget {
   const VerifyAccessScannerScreen({super.key});
@@ -22,6 +24,7 @@ class VerifyAccessScannerScreen extends StatefulWidget {
 class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen>
     with WidgetsBindingObserver {
   late MobileScannerController _cameraController;
+  late TextEditingController _manualCodeController;
   bool _isDisposed = false;
   bool _hasNavigated = false;
   bool _isTorchOn = false;
@@ -31,6 +34,7 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _manualCodeController = TextEditingController();
     _cameraController = MobileScannerController(
       detectionSpeed: DetectionSpeed.normal,
       facing: CameraFacing.back,
@@ -55,6 +59,7 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen>
   void dispose() {
     _isDisposed = true;
     WidgetsBinding.instance.removeObserver(this);
+    _manualCodeController.dispose();
     _cameraController.dispose();
     super.dispose();
   }
@@ -147,6 +152,39 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen>
 
     LocalPassRegistry.instance.registerVisitorPass(pass);
     _handleDecodedString(pass.toQrPayload());
+  }
+
+  void _verifyManualCode(String input) {
+    final code = input.trim();
+    if (code.isEmpty) return;
+
+    // Check if code matches a visitor pass ID in registry
+    final visitorPass =
+        LocalPassRegistry.instance.findVisitorPass(code.toUpperCase());
+    if (visitorPass != null) {
+      _handleDecodedString(visitorPass.toQrPayload());
+      return;
+    }
+
+    // Check if code matches an event pass ID in registry
+    final eventPass =
+        LocalPassRegistry.instance.findEventPass(code.toUpperCase());
+    if (eventPass != null) {
+      _handleDecodedString(eventPass.toQrPayload());
+      return;
+    }
+
+    // If input is raw JSON or formatted string, try parsing directly
+    if (code.startsWith('{')) {
+      _handleDecodedString(code);
+      return;
+    }
+
+    // Otherwise pass unrecognized payload with entered passId so verification properly rejects it
+    _handleDecodedString(jsonEncode({
+      'passId': code.toUpperCase(),
+      'type': 'unrecognized',
+    }));
   }
 
   @override
@@ -546,6 +584,105 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen>
                     ),
                   ),
                 ),
+
+                const SizedBox(height: 20),
+                const Divider(color: AppColors.border, height: 1),
+                const SizedBox(height: 16),
+
+                // Manual Pass ID Lookup
+                const Row(
+                  children: [
+                    Icon(Icons.pin_outlined, size: 16, color: AppColors.black),
+                    SizedBox(width: 8),
+                    Text(
+                      'OR ENTER PASS ID MANUALLY',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                AppTextField(
+                  hintText: 'Enter Pass ID (e.g. VP-12345 or EP-12345)',
+                  controller: _manualCodeController,
+                  textCapitalization: TextCapitalization.characters,
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () =>
+                        _verifyManualCode(_manualCodeController.text),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.black,
+                      side:
+                          const BorderSide(color: AppColors.black, width: 1.5),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      'VERIFY ENTERED CODE',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Session pass quick chips if any created by resident in this session
+                if (LocalPassRegistry.instance.allVisitorPasses.isNotEmpty ||
+                    LocalPassRegistry.instance.allEventPasses.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'PASSES CREATED IN THIS SESSION:',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final p in LocalPassRegistry.instance.allVisitorPasses)
+                        ActionChip(
+                          avatar: const Icon(Icons.person,
+                              size: 14, color: AppColors.black),
+                          label:
+                              Text('${p.passId} (${p.invitation.visitorName})'),
+                          labelStyle: const TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700),
+                          backgroundColor: AppColors.gray100,
+                          side: const BorderSide(color: AppColors.border),
+                          onPressed: () =>
+                              _handleDecodedString(p.toQrPayload()),
+                        ),
+                      for (final ep in LocalPassRegistry.instance.allEventPasses)
+                        ActionChip(
+                          avatar: const Icon(Icons.event,
+                              size: 14, color: AppColors.black),
+                          label: Text('${ep.passId} (${ep.event.name})'),
+                          labelStyle: const TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w700),
+                          backgroundColor: AppColors.gray100,
+                          side: const BorderSide(color: AppColors.border),
+                          onPressed: () =>
+                              _handleDecodedString(ep.toQrPayload()),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
