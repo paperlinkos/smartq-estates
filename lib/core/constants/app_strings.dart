@@ -227,4 +227,17 @@ class AppStrings {
   static const String labelVehicleSection = 'VEHICLE';
   static const String labelAccessGranted = 'ACCESS GRANTED';
   static const String backToSecurityHome = 'BACK TO SECURITY HOME';
+
+  // Phase 5D — Access Log + Check-In
+  static const String allowEntryAction = 'ALLOW ENTRY';
+  static const String allowEntrySubtitle = 'Record this person as entering the estate.';
+  static const String allowEntryConfirmTitle = 'ALLOW ENTRY?';
+  static const String allowEntryConfirmCancel = 'CANCEL';
+  static const String entryRecordedTitle = 'ENTRY RECORDED';
+  static const String labelEntry = 'ENTRY';
+  static const String labelGate = 'GATE';
+  static const String labelEventAccess = 'EVENT ACCESS';
+  static const String checkedInSuffix = 'CHECKED IN';
+  static const String accessEventsSuffix = 'ACCESS EVENTS';
 }
+

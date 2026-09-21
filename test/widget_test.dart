@@ -38,7 +38,9 @@ import 'package:smartq_estates/core/models/pass_verification_result.dart';
 import 'package:smartq_estates/core/repositories/pass_registry.dart';
 import 'package:smartq_estates/core/services/pass_verification_service.dart';
 import 'package:smartq_estates/screens/security/access_result_screen.dart';
-
+// Phase 5D imports
+import 'package:smartq_estates/core/models/access_record.dart';
+import 'package:smartq_estates/core/repositories/access_log_repository.dart';
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -1629,7 +1631,401 @@ void main() {
       expect(find.text('OPEN RESULT'), findsOneWidget);
     });
   });
+
+  group('SmartQ Estates - Phase 5D AccessRecord Tests', () {
+    test('AccessRecord.create sets defaults, generates ID, and sets entry type', () {
+      final now = DateTime.now();
+      final record = AccessRecord.create(
+        passId: 'VP-TEST-1',
+        passType: QrPayloadType.visitor,
+        subjectName: 'Alice Green',
+        gateId: 'GATE 1',
+        enteredAt: now,
+      );
+
+      expect(record.id.startsWith('AR-'), isTrue);
+      expect(record.passId, 'VP-TEST-1');
+      expect(record.passType, QrPayloadType.visitor);
+      expect(record.accessType, AccessType.entry);
+      expect(record.subjectName, 'Alice Green');
+      expect(record.gateId, 'GATE 1');
+      expect(record.enteredAt, now);
+      expect(record.createdAt, now);
+      expect(record.recordedBy, isNull);
+    });
+  });
+
+  group('SmartQ Estates - Phase 5D AccessLogRepository Tests', () {
+    late LocalAccessLogRepository repo;
+    final qrService = MockQrCodeService();
+
+    setUp(() {
+      repo = LocalAccessLogRepository.testInstance();
+    });
+
+    test('recordEntry records visitor entry with subjectName from invitation', () {
+      final inv = VisitorInvitation(
+        id: 'inv_5d_01',
+        visitorName: 'David Clark',
+        phoneNumber: '08011112222',
+        visitDate: DateTime.now(),
+        arrivalTime: const TimeOfDay(hour: 14, minute: 0),
+        createdAt: DateTime.now(),
+      );
+      final pass = qrService.createVisitorPass(invitation: inv);
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        visitorPass: pass,
+      );
+
+      final record = repo.recordEntry(result: result, gateId: 'GATE 1');
+
+      expect(record.passId, pass.passId);
+      expect(record.subjectName, 'David Clark');
+      expect(record.passType, QrPayloadType.visitor);
+      expect(record.gateId, 'GATE 1');
+      expect(repo.getTodayEntries().length, 1);
+      expect(repo.getRecentEntries().first.id, record.id);
+    });
+
+    test('recordEntry records event entry with subjectName from event', () {
+      final event = EstateEvent(
+        id: 'evt_5d_01',
+        name: 'Community BBQ',
+        eventDate: DateTime.now(),
+        startTime: const TimeOfDay(hour: 16, minute: 0),
+        endTime: const TimeOfDay(hour: 20, minute: 0),
+        expectedGuests: 50,
+        createdAt: DateTime.now(),
+      );
+      final pass = qrService.createEventPass(event: event);
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.event,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        eventPass: pass,
+      );
+
+      final record = repo.recordEntry(result: result, gateId: 'GATE 2');
+
+      expect(record.passId, pass.passId);
+      expect(record.subjectName, 'Community BBQ');
+      expect(record.passType, QrPayloadType.event);
+      expect(record.gateId, 'GATE 2');
+      expect(repo.getTodayEntries().length, 1);
+    });
+
+    test('recordEntry throws ArgumentError when outcome is not valid', () {
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.expired,
+        passType: QrPayloadType.visitor,
+        passId: 'VP-EXPIRED',
+        verifiedAt: DateTime.now(),
+      );
+
+      expect(
+        () => repo.recordEntry(result: result, gateId: 'GATE 1'),
+        throwsArgumentError,
+      );
+      expect(repo.getTodayEntries(), isEmpty);
+    });
+
+    test('getTodayEntries filters by current date and getRecentEntries respects limit', () {
+      final now = DateTime.now();
+      final yesterday = now.subtract(const Duration(days: 1));
+
+      final inv = VisitorInvitation(
+        id: 'inv_5d_02',
+        visitorName: 'Yesterday Visitor',
+        phoneNumber: '08033334444',
+        visitDate: yesterday,
+        arrivalTime: const TimeOfDay(hour: 10, minute: 0),
+        createdAt: yesterday,
+      );
+      final pass = qrService.createVisitorPass(invitation: inv);
+      final validResult = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: pass.passId,
+        verifiedAt: now,
+        visitorPass: pass,
+      );
+
+      repo.recordEntry(result: validResult, gateId: 'GATE 1', timestamp: yesterday);
+      expect(repo.getTodayEntries(), isEmpty);
+      expect(repo.getRecentEntries().length, 1);
+
+      repo.recordEntry(result: validResult, gateId: 'GATE 1', timestamp: now);
+      expect(repo.getTodayEntries().length, 1);
+      expect(repo.getRecentEntries(limit: 1).length, 1);
+      expect(repo.getRecentEntries().length, 2);
+
+      repo.clear();
+      expect(repo.getTodayEntries(), isEmpty);
+      expect(repo.getRecentEntries(), isEmpty);
+    });
+  });
+
+  group('SmartQ Estates - Phase 5D AccessResultScreen Check-In Widget Tests', () {
+    late LocalAccessLogRepository testRepo;
+    final qrService = MockQrCodeService();
+
+    setUp(() {
+      testRepo = LocalAccessLogRepository.testInstance();
+    });
+
+    testWidgets('ACCESS ALLOWED renders ALLOW ENTRY button and subtitle', (tester) async {
+      final inv = VisitorInvitation(
+        id: 'inv_5d_03',
+        visitorName: 'Michael Brown',
+        phoneNumber: '08099998888',
+        visitDate: DateTime.now(),
+        arrivalTime: const TimeOfDay(hour: 10, minute: 0),
+        createdAt: DateTime.now(),
+      );
+      final pass = qrService.createVisitorPass(invitation: inv);
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        visitorPass: pass,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AccessResultScreen(
+            payload: payload,
+            verificationService: _FixedResultService(result),
+            accessLogRepository: testRepo,
+          ),
+        ),
+      );
+
+      expect(find.text(AppStrings.accessAllowed), findsWidgets);
+      expect(find.text(AppStrings.allowEntryAction), findsOneWidget);
+      expect(find.text(AppStrings.allowEntrySubtitle), findsOneWidget);
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('ACCESS DENIED does NOT render ALLOW ENTRY button or subtitle', (tester) async {
+      final payload = DecodedQrPayload.unrecognized('GARBAGE');
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.unrecognized,
+        passType: QrPayloadType.unrecognized,
+        verifiedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AccessResultScreen(
+            payload: payload,
+            verificationService: _FixedResultService(result),
+            accessLogRepository: testRepo,
+          ),
+        ),
+      );
+
+      expect(find.text(AppStrings.accessDenied), findsWidgets);
+      expect(find.text(AppStrings.allowEntryAction), findsNothing);
+      expect(find.text(AppStrings.allowEntrySubtitle), findsNothing);
+      expect(find.text(AppStrings.doneAction), findsNothing);
+    });
+
+    testWidgets('ALLOW ENTRY flow: dialog cancel does NOT record entry', (tester) async {
+      final inv = VisitorInvitation(
+        id: 'inv_5d_04',
+        visitorName: 'Elena Rostova',
+        phoneNumber: '08022223333',
+        visitDate: DateTime.now(),
+        arrivalTime: const TimeOfDay(hour: 11, minute: 0),
+        createdAt: DateTime.now(),
+      );
+      final pass = qrService.createVisitorPass(invitation: inv);
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        visitorPass: pass,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AccessResultScreen(
+            payload: payload,
+            verificationService: _FixedResultService(result),
+            accessLogRepository: testRepo,
+          ),
+        ),
+      );
+
+      // Tap ALLOW ENTRY
+      await tester.tap(find.text(AppStrings.allowEntryAction));
+      await tester.pumpAndSettle();
+
+      // Dialog is displayed with visitor name
+      expect(find.text(AppStrings.allowEntryConfirmTitle), findsOneWidget);
+      expect(find.text('Elena Rostova'), findsWidgets);
+
+      // Tap CANCEL
+      await tester.tap(find.text(AppStrings.allowEntryConfirmCancel));
+      await tester.pumpAndSettle();
+
+      // Dialog dismissed, no entry recorded, button still visible
+      expect(find.text(AppStrings.allowEntryConfirmTitle), findsNothing);
+      expect(find.text(AppStrings.allowEntryAction), findsOneWidget);
+      expect(testRepo.getTodayEntries(), isEmpty);
+    });
+
+    testWidgets('ALLOW ENTRY flow: confirm records entry, shows ENTRY RECORDED card, prevents duplicate entry', (tester) async {
+      final inv = VisitorInvitation(
+        id: 'inv_5d_05',
+        visitorName: 'Elena Rostova',
+        phoneNumber: '08022223333',
+        visitDate: DateTime.now(),
+        arrivalTime: const TimeOfDay(hour: 11, minute: 0),
+        createdAt: DateTime.now(),
+      );
+      final pass = qrService.createVisitorPass(invitation: inv);
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        visitorPass: pass,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AccessResultScreen(
+            payload: payload,
+            verificationService: _FixedResultService(result),
+            accessLogRepository: testRepo,
+          ),
+        ),
+      );
+
+      // Tap ALLOW ENTRY
+      await tester.tap(find.text(AppStrings.allowEntryAction));
+      await tester.pumpAndSettle();
+
+      // Tap ALLOW ENTRY in dialog (finds instance inside dialog)
+      final dialogAllowButton = find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text(AppStrings.allowEntryAction),
+      );
+      await tester.tap(dialogAllowButton);
+      await tester.pumpAndSettle();
+
+      // Entry is recorded in repo
+      expect(testRepo.getTodayEntries().length, 1);
+      expect(testRepo.getTodayEntries().first.subjectName, 'Elena Rostova');
+
+      // UI updates to ENTRY RECORDED
+      expect(find.text(AppStrings.entryRecordedTitle), findsOneWidget);
+      expect(find.text(AppStrings.labelEntry), findsOneWidget);
+      expect(find.text(AppStrings.labelGate), findsOneWidget);
+      expect(find.text('GATE 1'), findsOneWidget);
+
+      // ALLOW ENTRY button is completely removed (preventing duplicate entry)
+      expect(find.text(AppStrings.allowEntryAction), findsNothing);
+      expect(find.text(AppStrings.allowEntrySubtitle), findsNothing);
+
+      // DONE button is still present
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 5D SecurityHomeScreen Activity Tests', () {
+    late LocalAccessLogRepository testRepo;
+    final qrService = MockQrCodeService();
+
+    setUp(() {
+      testRepo = LocalAccessLogRepository.testInstance();
+    });
+
+    testWidgets('Renders NO ACTIVITY when no check-ins exist', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SecurityHomeScreen(accessLogRepository: testRepo),
+        ),
+      );
+
+      expect(find.text(AppStrings.securityTitle), findsOneWidget);
+      expect(find.text(AppStrings.noActivityStatus), findsNWidgets(2)); // visitors and events
+      expect(find.text(AppStrings.noRecentActivity), findsOneWidget);
+      expect(find.text(AppStrings.recentActivitySubtitle), findsOneWidget);
+    });
+
+    testWidgets('Renders dynamic check-in count and recent activity list after records added', (tester) async {
+      // Add a visitor record and an event record to testRepo
+      final inv = VisitorInvitation(
+        id: 'inv_5d_06',
+        visitorName: 'Marcus Vance',
+        phoneNumber: '08077778888',
+        visitDate: DateTime.now(),
+        arrivalTime: const TimeOfDay(hour: 9, minute: 30),
+        createdAt: DateTime.now(),
+      );
+      final visitorPass = qrService.createVisitorPass(invitation: inv);
+      final visitorResult = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: visitorPass.passId,
+        verifiedAt: DateTime.now(),
+        visitorPass: visitorPass,
+      );
+      testRepo.recordEntry(result: visitorResult, gateId: 'GATE 1');
+
+      final event = EstateEvent(
+        id: 'evt_5d_02',
+        name: 'Summer Gala',
+        eventDate: DateTime.now(),
+        startTime: const TimeOfDay(hour: 18, minute: 0),
+        endTime: const TimeOfDay(hour: 22, minute: 0),
+        expectedGuests: 100,
+        createdAt: DateTime.now(),
+      );
+      final eventPass = qrService.createEventPass(event: event);
+      final eventResult = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.event,
+        passId: eventPass.passId,
+        verifiedAt: DateTime.now(),
+        eventPass: eventPass,
+      );
+      testRepo.recordEntry(result: eventResult, gateId: 'GATE 1');
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SecurityHomeScreen(accessLogRepository: testRepo),
+        ),
+      );
+
+      // Verify TODAY counts
+      expect(find.text('1 ${AppStrings.checkedInSuffix}'), findsOneWidget);
+      expect(find.text('1 ${AppStrings.accessEventsSuffix}'), findsOneWidget);
+
+      // Verify RECENT ACTIVITY items
+      expect(find.text(AppStrings.noRecentActivity), findsNothing);
+      expect(find.text('Marcus Vance'), findsOneWidget);
+      expect(find.text('Summer Gala'), findsOneWidget);
+      expect(find.text('VISITOR · GATE 1'), findsOneWidget);
+      expect(find.text('EVENT · GATE 1'), findsOneWidget);
+      expect(find.text(AppStrings.labelEntry), findsNWidgets(2));
+    });
+  });
+
 }
+
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
 

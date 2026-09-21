@@ -1,35 +1,40 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/models/access_record.dart';
 import '../../core/models/decoded_qr_payload.dart';
 import '../../core/models/event_pass.dart';
 import '../../core/models/pass_verification_result.dart';
 import '../../core/models/visitor_pass.dart';
+import '../../core/repositories/access_log_repository.dart';
 import '../../core/services/pass_verification_service.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_header.dart';
 
-/// The definitive access decision screen for Phase 5C.
+/// The definitive access decision screen for Phase 5C & 5D.
 ///
 /// Receives a [DecodedQrPayload] from the scanner, runs it through
 /// [PassVerificationService], and presents either ACCESS ALLOWED or ACCESS DENIED
 /// to the security officer.
 ///
-/// This screen runs verification in [initState] — it does not expose
-/// the payload's own status fields to make any decisions. The service
-/// is the sole decision-maker.
+/// On ACCESS ALLOWED, the officer may tap [ALLOW ENTRY] to record entry in the
+/// estate access log.
 class AccessResultScreen extends StatefulWidget {
   final DecodedQrPayload payload;
 
   /// Allows injecting a custom service in tests (bypasses LocalPassRegistry).
   final PassVerificationService? verificationService;
 
+  /// Allows injecting a custom access log repository in tests.
+  final AccessLogRepository? accessLogRepository;
+
   const AccessResultScreen({
     super.key,
     required this.payload,
     this.verificationService,
+    this.accessLogRepository,
   });
 
   @override
@@ -38,12 +43,16 @@ class AccessResultScreen extends StatefulWidget {
 
 class _AccessResultScreenState extends State<AccessResultScreen> {
   late final PassVerificationResult _result;
+  late final AccessLogRepository _accessLogRepo;
+  bool _checkedIn = false;
+  AccessRecord? _accessRecord;
 
   @override
   void initState() {
     super.initState();
     final service = widget.verificationService ?? LocalPassVerificationService();
     _result = service.verify(widget.payload);
+    _accessLogRepo = widget.accessLogRepository ?? LocalAccessLogRepository.instance;
   }
 
   String _formatDate(DateTime dt) {
@@ -59,6 +68,82 @@ class _AccessResultScreenState extends State<AccessResultScreen> {
     final period = t.period == DayPeriod.am ? 'AM' : 'PM';
     final minute = t.minute.toString().padLeft(2, '0');
     return '$hour:$minute $period';
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    final minute = dt.minute.toString().padLeft(2, '0');
+    return '$hour:$minute $period';
+  }
+
+  Future<void> _confirmAllowEntry() async {
+    final subjectName = _result.visitorPass?.invitation.visitorName ??
+        _result.eventPass?.event.name ??
+        _result.passId ??
+        '';
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border, width: 1),
+        ),
+        title: const Text(
+          AppStrings.allowEntryConfirmTitle,
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            letterSpacing: 0.5,
+          ),
+        ),
+        content: Text(
+          subjectName,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(
+              AppStrings.allowEntryConfirmCancel,
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              AppStrings.allowEntryAction,
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final record = _accessLogRepo.recordEntry(
+        result: _result,
+        gateId: 'GATE 1',
+      );
+      setState(() {
+        _checkedIn = true;
+        _accessRecord = record;
+      });
+    }
   }
 
   @override
@@ -105,12 +190,40 @@ class _AccessResultScreenState extends State<AccessResultScreen> {
 
               if (!isAllowed) _DenialDetail(result: _result),
 
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
-              // ── DONE (only on allowed) ──────────────────────────────────
+              // ── Phase 5D: ALLOW ENTRY or ENTRY RECORDED ─────────────────
               if (isAllowed) ...[
+                if (!_checkedIn) ...[
+                  AppButton(
+                    text: AppStrings.allowEntryAction,
+                    onPressed: _confirmAllowEntry,
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    AppStrings.allowEntrySubtitle,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppColors.textTertiary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ] else ...[
+                  _EntryRecordedCard(
+                    record: _accessRecord!,
+                    formatDateTime: _formatDateTime,
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // ── DONE (only on allowed) ──────────────────────────────────
                 AppButton(
                   text: AppStrings.doneAction,
+                  variant: _checkedIn
+                      ? AppButtonVariant.primary
+                      : AppButtonVariant.secondary,
                   onPressed: () {
                     Navigator.of(context).popUntil(
                       ModalRoute.withName(AppRouter.security),
@@ -123,7 +236,7 @@ class _AccessResultScreenState extends State<AccessResultScreen> {
               // ── SCAN AGAIN (always present) ─────────────────────────────
               AppButton(
                 text: AppStrings.scanAgainAction,
-                variant: isAllowed ? AppButtonVariant.secondary : AppButtonVariant.primary,
+                variant: AppButtonVariant.secondary,
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -133,6 +246,7 @@ class _AccessResultScreenState extends State<AccessResultScreen> {
     );
   }
 }
+
 
 // ─── Decision Badge ──────────────────────────────────────────────────────────
 
@@ -427,3 +541,89 @@ class _DetailRow extends StatelessWidget {
     );
   }
 }
+
+// ─── Entry Recorded Card ─────────────────────────────────────────────────────
+
+class _EntryRecordedCard extends StatelessWidget {
+  final AccessRecord record;
+  final String Function(DateTime) formatDateTime;
+
+  const _EntryRecordedCard({
+    required this.record,
+    required this.formatDateTime,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isVisitor = record.passType == QrPayloadType.visitor;
+
+    return AppCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.black,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_rounded, color: AppColors.white, size: 14),
+                    SizedBox(width: 5),
+                    Text(
+                      AppStrings.entryRecordedTitle,
+                      style: TextStyle(
+                        color: AppColors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _DetailRow(
+            label: isVisitor
+                ? AppStrings.labelVisitorSection
+                : AppStrings.labelEventAccess,
+            value: record.subjectName,
+            isPrimary: true,
+          ),
+          const Divider(height: 22),
+          Row(
+            children: [
+              Expanded(
+                child: _DetailRow(
+                  label: AppStrings.labelEntry,
+                  value: formatDateTime(record.enteredAt),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DetailRow(
+                  label: AppStrings.labelGate,
+                  value: record.gateId,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 22),
+          _DetailRow(
+            label: isVisitor ? AppStrings.labelPass : AppStrings.labelEventCode,
+            value: record.passId,
+            isMonospace: true,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
