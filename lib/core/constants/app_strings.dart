@@ -393,5 +393,37 @@ class AppStrings {
       'Please describe what needs fixing.';
   static const String labelCategorySummary = 'CATEGORY';
   static const String labelDescriptionSummary = 'WHAT NEEDS FIXING';
+
+  // Phase 7 — Service Request Lifecycle, Resident Status Hub & Estate Operations
+  static const String myRequestsTitle = 'MY REQUESTS';
+  static const String myRequestsSubtitle = 'TRACK YOUR ESTATE SERVICE REQUESTS.';
+  static const String activeRequestsSection = 'ACTIVE REQUESTS';
+  static const String viewAllRequests = 'VIEW ALL';
+  static const String tabActive = 'ACTIVE';
+  static const String tabHistory = 'HISTORY';
+  static const String noActiveRequests = 'NO ACTIVE REQUESTS';
+  static const String noActiveRequestsSubtitle =
+      'Your active service and maintenance requests will appear here.';
+  static const String noPastRequests = 'NO PAST REQUESTS';
+  static const String noPastRequestsSubtitle =
+      'Completed and cancelled service requests will appear here.';
+  static const String requestDetailTitle = 'REQUEST DETAILS';
+  static const String requestDetailSubtitle = 'CURRENT PROGRESS AND STATUS.';
+  static const String timelineStep1 = 'REQUESTED';
+  static const String timelineStep2 = 'IN PROGRESS';
+  static const String timelineStep3 = 'COMPLETED';
+  static const String actionCancelRequest = 'CANCEL REQUEST';
+  static const String cancelDialogTitle = 'CANCEL REQUEST?';
+  static const String cancelDialogContent =
+      'Are you sure you want to cancel this service request? This action cannot be undone.';
+  static const String actionConfirmCancel = 'YES, CANCEL';
+  static const String actionKeepRequest = 'KEEP REQUEST';
+  static const String requestCancelledNotice = 'This request has been cancelled.';
+  static const String operationsDeskTitle = 'SERVICES DESK';
+  static const String operationsDeskSubtitle =
+      'ESTATE FACILITY SERVICE MANAGEMENT.';
+  static const String filterAll = 'ALL';
+  static const String actionAdvanceStatus = 'ADVANCE STATUS';
+  static const String statusUpdatedNotice = 'Status updated successfully.';
 }
 

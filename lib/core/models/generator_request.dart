@@ -1,3 +1,5 @@
+import 'service_request_item.dart';
+
 /// The timing preference specified by the resident for their generator service.
 enum GeneratorTiming {
   asSoonAsPossible,
@@ -17,7 +19,6 @@ enum GeneratorTiming {
 }
 
 /// The operational status of a generator service request.
-/// In Phase 6F, only [requested] is actively used. Other states are reserved for future phases.
 enum GeneratorRequestStatus {
   requested,
   assigned,
@@ -42,8 +43,9 @@ enum GeneratorRequestStatus {
 }
 
 /// A structured model representing a resident's request for generator maintenance or repair.
-class GeneratorRequest {
+class GeneratorRequest implements ServiceRequestItem {
   /// Unique request identifier (e.g. 'GEN-1710000000000').
+  @override
   final String id;
 
   /// Detailed description of the service, maintenance, or issue needed.
@@ -59,15 +61,18 @@ class GeneratorRequest {
   final DateTime? scheduledFor;
 
   /// Delivery/service location identifier. Currently defaults to 'estateAddress'.
+  @override
   final String deliveryLocation;
 
   /// Optional additional instructions provided by the resident.
+  @override
   final String? notes;
 
   /// Current lifecycle status of the request.
   final GeneratorRequestStatus status;
 
   /// Timestamp when the request was submitted.
+  @override
   final DateTime createdAt;
 
   const GeneratorRequest({
@@ -100,7 +105,8 @@ class GeneratorRequest {
     return GeneratorRequest(
       id: 'GEN-${now.microsecondsSinceEpoch}',
       serviceDescription: serviceDescription.trim(),
-      generatorModel: cleanModel != null && cleanModel.isNotEmpty ? cleanModel : null,
+      generatorModel:
+          cleanModel != null && cleanModel.isNotEmpty ? cleanModel : null,
       timing: timing,
       scheduledFor: scheduledFor,
       deliveryLocation: deliveryLocation,
@@ -109,4 +115,90 @@ class GeneratorRequest {
       createdAt: now,
     );
   }
+
+  /// Creates a copy with modified values.
+  GeneratorRequest copyWith({
+    String? serviceDescription,
+    String? generatorModel,
+    GeneratorTiming? timing,
+    DateTime? scheduledFor,
+    String? deliveryLocation,
+    String? notes,
+    GeneratorRequestStatus? status,
+  }) {
+    return GeneratorRequest(
+      id: id,
+      serviceDescription: serviceDescription ?? this.serviceDescription,
+      generatorModel: generatorModel ?? this.generatorModel,
+      timing: timing ?? this.timing,
+      scheduledFor: scheduledFor ?? this.scheduledFor,
+      deliveryLocation: deliveryLocation ?? this.deliveryLocation,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      createdAt: createdAt,
+    );
+  }
+
+  // ── ServiceRequestItem Implementation ──────────────────────────────────────
+
+  @override
+  String get serviceTitle => 'GENERATOR';
+
+  @override
+  String get serviceType => 'generator';
+
+  @override
+  String get summaryText => generatorModel != null && generatorModel!.isNotEmpty
+      ? '$generatorModel · $serviceDescription'
+      : serviceDescription;
+
+  @override
+  String get timingDisplay {
+    switch (timing) {
+      case GeneratorTiming.asSoonAsPossible:
+        return 'AS SOON AS POSSIBLE';
+      case GeneratorTiming.laterToday:
+        return 'LATER TODAY';
+      case GeneratorTiming.scheduled:
+        if (scheduledFor != null) {
+          const months = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+          ];
+          final hour = scheduledFor!.hour == 0
+              ? 12
+              : (scheduledFor!.hour > 12 ? scheduledFor!.hour - 12 : scheduledFor!.hour);
+          final period = scheduledFor!.hour >= 12 ? 'PM' : 'AM';
+          final minute = scheduledFor!.minute.toString().padLeft(2, '0');
+          return '${scheduledFor!.day} ${months[scheduledFor!.month - 1]}, ${scheduledFor!.year} · $hour:$minute $period';
+        }
+        return 'SCHEDULED';
+    }
+  }
+
+  @override
+  String get statusDisplayName => status.displayName;
+
+  @override
+  ServiceOperationalPhase get operationalPhase {
+    switch (status) {
+      case GeneratorRequestStatus.requested:
+        return ServiceOperationalPhase.requested;
+      case GeneratorRequestStatus.assigned:
+      case GeneratorRequestStatus.inProgress:
+        return ServiceOperationalPhase.inProgress;
+      case GeneratorRequestStatus.completed:
+        return ServiceOperationalPhase.completed;
+      case GeneratorRequestStatus.cancelled:
+        return ServiceOperationalPhase.cancelled;
+    }
+  }
+
+  @override
+  bool get isActive =>
+      status != GeneratorRequestStatus.completed &&
+      status != GeneratorRequestStatus.cancelled;
+
+  @override
+  bool get canBeCancelled => status == GeneratorRequestStatus.requested;
 }

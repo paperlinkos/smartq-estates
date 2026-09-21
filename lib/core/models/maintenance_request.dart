@@ -1,3 +1,5 @@
+import 'service_request_item.dart';
+
 /// The timing preference specified by the resident for their maintenance service.
 enum MaintenanceTiming {
   asSoonAsPossible,
@@ -17,7 +19,6 @@ enum MaintenanceTiming {
 }
 
 /// The operational status of a maintenance request.
-/// In Phase 6G, only [requested] is actively used. Other states are reserved for future phases.
 enum MaintenanceRequestStatus {
   requested,
   assigned,
@@ -42,8 +43,9 @@ enum MaintenanceRequestStatus {
 }
 
 /// A structured model representing a resident's request for household or property repairs.
-class MaintenanceRequest {
+class MaintenanceRequest implements ServiceRequestItem {
   /// Unique request identifier (e.g. 'MAINT-1710000000000').
+  @override
   final String id;
 
   /// Detailed description of the maintenance issue or item needing attention.
@@ -59,15 +61,18 @@ class MaintenanceRequest {
   final DateTime? scheduledFor;
 
   /// Delivery/service location identifier. Currently defaults to 'estateAddress'.
+  @override
   final String deliveryLocation;
 
   /// Optional additional instructions provided by the resident.
+  @override
   final String? notes;
 
   /// Current lifecycle status of the request.
   final MaintenanceRequestStatus status;
 
   /// Timestamp when the request was submitted.
+  @override
   final DateTime createdAt;
 
   const MaintenanceRequest({
@@ -111,4 +116,90 @@ class MaintenanceRequest {
       createdAt: now,
     );
   }
+
+  /// Creates a copy with modified values.
+  MaintenanceRequest copyWith({
+    String? description,
+    String? category,
+    MaintenanceTiming? timing,
+    DateTime? scheduledFor,
+    String? deliveryLocation,
+    String? notes,
+    MaintenanceRequestStatus? status,
+  }) {
+    return MaintenanceRequest(
+      id: id,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      timing: timing ?? this.timing,
+      scheduledFor: scheduledFor ?? this.scheduledFor,
+      deliveryLocation: deliveryLocation ?? this.deliveryLocation,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      createdAt: createdAt,
+    );
+  }
+
+  // ── ServiceRequestItem Implementation ──────────────────────────────────────
+
+  @override
+  String get serviceTitle => 'MAINTENANCE';
+
+  @override
+  String get serviceType => 'maintenance';
+
+  @override
+  String get summaryText => category != null && category!.isNotEmpty
+      ? '$category · $description'
+      : description;
+
+  @override
+  String get timingDisplay {
+    switch (timing) {
+      case MaintenanceTiming.asSoonAsPossible:
+        return 'AS SOON AS POSSIBLE';
+      case MaintenanceTiming.laterToday:
+        return 'LATER TODAY';
+      case MaintenanceTiming.scheduled:
+        if (scheduledFor != null) {
+          const months = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+          ];
+          final hour = scheduledFor!.hour == 0
+              ? 12
+              : (scheduledFor!.hour > 12 ? scheduledFor!.hour - 12 : scheduledFor!.hour);
+          final period = scheduledFor!.hour >= 12 ? 'PM' : 'AM';
+          final minute = scheduledFor!.minute.toString().padLeft(2, '0');
+          return '${scheduledFor!.day} ${months[scheduledFor!.month - 1]}, ${scheduledFor!.year} · $hour:$minute $period';
+        }
+        return 'SCHEDULED';
+    }
+  }
+
+  @override
+  String get statusDisplayName => status.displayName;
+
+  @override
+  ServiceOperationalPhase get operationalPhase {
+    switch (status) {
+      case MaintenanceRequestStatus.requested:
+        return ServiceOperationalPhase.requested;
+      case MaintenanceRequestStatus.assigned:
+      case MaintenanceRequestStatus.inProgress:
+        return ServiceOperationalPhase.inProgress;
+      case MaintenanceRequestStatus.completed:
+        return ServiceOperationalPhase.completed;
+      case MaintenanceRequestStatus.cancelled:
+        return ServiceOperationalPhase.cancelled;
+    }
+  }
+
+  @override
+  bool get isActive =>
+      status != MaintenanceRequestStatus.completed &&
+      status != MaintenanceRequestStatus.cancelled;
+
+  @override
+  bool get canBeCancelled => status == MaintenanceRequestStatus.requested;
 }

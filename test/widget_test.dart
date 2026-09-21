@@ -74,6 +74,13 @@ import 'package:smartq_estates/core/models/maintenance_request.dart';
 import 'package:smartq_estates/core/repositories/maintenance_repository.dart';
 import 'package:smartq_estates/screens/services/maintenance_screen.dart';
 import 'package:smartq_estates/screens/services/maintenance_requested_screen.dart';
+// Phase 7 imports
+import 'package:smartq_estates/core/models/service_request_item.dart';
+import 'package:smartq_estates/core/services/service_coordinator.dart';
+import 'package:smartq_estates/screens/services/my_service_requests_screen.dart';
+import 'package:smartq_estates/screens/services/service_request_detail_screen.dart';
+import 'package:smartq_estates/screens/operations/estate_operations_screen.dart';
+
 
 
 
@@ -4877,7 +4884,554 @@ void main() {
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SMARTQ ESTATES — PHASE 7 TESTS (SERVICE LIFECYCLE, TRACKING & OPERATIONS)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('SmartQ Estates - Phase 7 ServiceRequestItem & Model copyWith Tests', () {
+    test('MarketRunRequest copyWith and ServiceRequestItem getters', () {
+      final req = MarketRunRequest.create(
+        items: 'Tomatoes and pepper',
+        timing: MarketRunTiming.asSoonAsPossible,
+      );
+
+      expect(req.serviceTitle, 'MARKET RUN');
+      expect(req.serviceType, 'marketRun');
+      expect(req.summaryText, 'Tomatoes and pepper');
+      expect(req.timingDisplay, 'AS SOON AS POSSIBLE');
+      expect(req.statusDisplayName, 'REQUESTED');
+      expect(req.operationalPhase, ServiceOperationalPhase.requested);
+      expect(req.isActive, isTrue);
+      expect(req.canBeCancelled, isTrue);
+
+      final updated = req.copyWith(status: MarketRunStatus.shopping);
+      expect(updated.status, MarketRunStatus.shopping);
+      expect(updated.statusDisplayName, 'SHOPPING');
+      expect(updated.operationalPhase, ServiceOperationalPhase.inProgress);
+      expect(updated.isActive, isTrue);
+      expect(updated.canBeCancelled, isFalse);
+
+      final delivered = updated.copyWith(status: MarketRunStatus.delivered);
+      expect(delivered.operationalPhase, ServiceOperationalPhase.completed);
+      expect(delivered.isActive, isFalse);
+    });
+
+    test('GroceryRequest copyWith and ServiceRequestItem getters', () {
+      final req = GroceryRequest.create(
+        items: 'Milk, bread, eggs',
+        timing: GroceryTiming.laterToday,
+      );
+
+      expect(req.serviceTitle, 'GROCERIES');
+      expect(req.serviceType, 'groceries');
+      expect(req.operationalPhase, ServiceOperationalPhase.requested);
+      expect(req.isActive, isTrue);
+      expect(req.canBeCancelled, isTrue);
+
+      final outForDelivery = req.copyWith(status: GroceryRequestStatus.outForDelivery);
+      expect(outForDelivery.operationalPhase, ServiceOperationalPhase.inProgress);
+      expect(outForDelivery.canBeCancelled, isFalse);
+
+      final cancelled = req.copyWith(status: GroceryRequestStatus.cancelled);
+      expect(cancelled.operationalPhase, ServiceOperationalPhase.cancelled);
+      expect(cancelled.isActive, isFalse);
+    });
+
+    test('GasRequest copyWith and ServiceRequestItem getters', () {
+      final req = GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+      );
+
+      expect(req.serviceTitle, 'COOKING GAS');
+      expect(req.serviceType, 'gas');
+      expect(req.summaryText, '12.5 KG');
+
+      final refilling = req.copyWith(status: GasRequestStatus.refilling);
+      expect(refilling.operationalPhase, ServiceOperationalPhase.inProgress);
+    });
+
+    test('PetrolRequest copyWith and ServiceRequestItem getters', () {
+      final req = PetrolRequest.create(
+        quantity: '25 L',
+        vehicle: 'Toyota Corolla',
+        timing: PetrolTiming.asSoonAsPossible,
+      );
+
+      expect(req.serviceTitle, 'PETROL');
+      expect(req.serviceType, 'petrol');
+      expect(req.summaryText, '25 L · Toyota Corolla');
+
+      final refuelling = req.copyWith(status: PetrolRequestStatus.refuelling);
+      expect(refuelling.operationalPhase, ServiceOperationalPhase.inProgress);
+    });
+
+    test('GeneratorRequest copyWith and ServiceRequestItem getters', () {
+      final req = GeneratorRequest.create(
+        serviceDescription: 'Check battery connection',
+        generatorModel: 'Firman 5kVA',
+        timing: GeneratorTiming.asSoonAsPossible,
+      );
+
+      expect(req.serviceTitle, 'GENERATOR');
+      expect(req.serviceType, 'generator');
+      expect(req.summaryText, 'Firman 5kVA · Check battery connection');
+
+      final inProgress = req.copyWith(status: GeneratorRequestStatus.inProgress);
+      expect(inProgress.operationalPhase, ServiceOperationalPhase.inProgress);
+      expect(inProgress.canBeCancelled, isFalse);
+
+      final completed = req.copyWith(status: GeneratorRequestStatus.completed);
+      expect(completed.operationalPhase, ServiceOperationalPhase.completed);
+      expect(completed.isActive, isFalse);
+    });
+
+    test('MaintenanceRequest copyWith and ServiceRequestItem getters', () {
+      final req = MaintenanceRequest.create(
+        description: 'Sink leak in kitchen',
+        category: 'PLUMBING',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      );
+
+      expect(req.serviceTitle, 'MAINTENANCE');
+      expect(req.serviceType, 'maintenance');
+      expect(req.summaryText, 'PLUMBING · Sink leak in kitchen');
+
+      final inProgress = req.copyWith(status: MaintenanceRequestStatus.inProgress);
+      expect(inProgress.operationalPhase, ServiceOperationalPhase.inProgress);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 Repository Lifecycle Tests', () {
+    test('updateStatus and cancelRequest on MarketRunRepository', () {
+      final repo = LocalMarketRunRepository.testInstance();
+      final req = repo.createRequest(MarketRunRequest.create(
+        items: 'Bananas',
+        timing: MarketRunTiming.asSoonAsPossible,
+      ));
+
+      final updated = repo.updateStatus(req.id, MarketRunStatus.shopping);
+      expect(updated?.status, MarketRunStatus.shopping);
+      expect(repo.getRequestById(req.id)?.status, MarketRunStatus.shopping);
+
+      // Cannot cancel once in shopping
+      expect(repo.cancelRequest(req.id), isFalse);
+
+      // Create another in requested status and cancel it
+      final req2 = repo.createRequest(MarketRunRequest.create(
+        items: 'Oranges',
+        timing: MarketRunTiming.asSoonAsPossible,
+      ));
+      expect(repo.cancelRequest(req2.id), isTrue);
+      expect(repo.getRequestById(req2.id)?.status, MarketRunStatus.cancelled);
+    });
+
+    test('updateStatus and cancelRequest on MaintenanceRepository', () {
+      final repo = LocalMaintenanceRepository.testInstance();
+      final req = repo.createRequest(MaintenanceRequest.create(
+        description: 'Broken latch',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      ));
+
+      expect(repo.cancelRequest(req.id), isTrue);
+      expect(repo.getRequestById(req.id)?.status, MaintenanceRequestStatus.cancelled);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 ServiceCoordinator Tests', () {
+    late LocalMarketRunRepository marketRunRepo;
+    late LocalGroceryRepository groceryRepo;
+    late LocalGasRepository gasRepo;
+    late LocalPetrolRepository petrolRepo;
+    late LocalGeneratorRepository generatorRepo;
+    late LocalMaintenanceRepository maintenanceRepo;
+    late ServiceCoordinator coordinator;
+
+    setUp(() {
+      marketRunRepo = LocalMarketRunRepository.testInstance();
+      groceryRepo = LocalGroceryRepository.testInstance();
+      gasRepo = LocalGasRepository.testInstance();
+      petrolRepo = LocalPetrolRepository.testInstance();
+      generatorRepo = LocalGeneratorRepository.testInstance();
+      maintenanceRepo = LocalMaintenanceRepository.testInstance();
+
+      coordinator = ServiceCoordinator(
+        marketRunRepo: marketRunRepo,
+        groceryRepo: groceryRepo,
+        gasRepo: gasRepo,
+        petrolRepo: petrolRepo,
+        generatorRepo: generatorRepo,
+        maintenanceRepo: maintenanceRepo,
+      );
+    });
+
+    test('getAllRequests aggregates all domains and sorts descending', () {
+      final t1 = DateTime(2026, 9, 21, 8, 0);
+      final t2 = DateTime(2026, 9, 21, 9, 0);
+      final t3 = DateTime(2026, 9, 21, 10, 0);
+
+      marketRunRepo.createRequest(MarketRunRequest.create(
+        items: 'Items 1',
+        timing: MarketRunTiming.asSoonAsPossible,
+        createdAt: t1,
+      ));
+      gasRepo.createRequest(GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+        createdAt: t3,
+      ));
+      maintenanceRepo.createRequest(MaintenanceRequest.create(
+        description: 'Repair door',
+        timing: MaintenanceTiming.asSoonAsPossible,
+        createdAt: t2,
+      ));
+
+      final all = coordinator.getAllRequests();
+      expect(all.length, 3);
+      expect(all[0].serviceTitle, 'COOKING GAS');
+      expect(all[1].serviceTitle, 'MAINTENANCE');
+      expect(all[2].serviceTitle, 'MARKET RUN');
+    });
+
+    test('getActiveRequests and getCompletedRequests filter correctly', () {
+      marketRunRepo.createRequest(MarketRunRequest.create(
+        items: 'Active market run',
+        timing: MarketRunTiming.asSoonAsPossible,
+      ));
+      final gasReq = gasRepo.createRequest(GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+      ));
+      gasRepo.updateStatus(gasReq.id, GasRequestStatus.delivered);
+
+      expect(coordinator.getActiveRequests().length, 1);
+      expect(coordinator.getActiveRequests().first.serviceTitle, 'MARKET RUN');
+
+      expect(coordinator.getCompletedRequests().length, 1);
+      expect(coordinator.getCompletedRequests().first.serviceTitle, 'COOKING GAS');
+    });
+
+    test('getRequestById finds request by ID', () {
+      final req = generatorRepo.createRequest(GeneratorRequest.create(
+        serviceDescription: 'Service generator',
+        timing: GeneratorTiming.asSoonAsPossible,
+      ));
+
+      final found = coordinator.getRequestById(req.id);
+      expect(found, isNotNull);
+      expect(found!.id, req.id);
+      expect(found.serviceTitle, 'GENERATOR');
+    });
+
+    test('cancelRequest cancels intake request', () {
+      final req = petrolRepo.createRequest(PetrolRequest.create(
+        quantity: '20 L',
+        timing: PetrolTiming.asSoonAsPossible,
+      ));
+
+      expect(coordinator.cancelRequest(req.id), isTrue);
+      expect(coordinator.getRequestById(req.id)?.statusDisplayName, 'CANCELLED');
+    });
+
+    test('advanceStatus moves request through lifecycle', () {
+      final req = maintenanceRepo.createRequest(MaintenanceRequest.create(
+        description: 'Paint wall',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      ));
+
+      // 1. requested -> assigned
+      expect(coordinator.advanceStatus(req.id), isTrue);
+      expect(coordinator.getRequestById(req.id)?.statusDisplayName, 'ASSIGNED');
+
+      // 2. assigned -> inProgress
+      expect(coordinator.advanceStatus(req.id), isTrue);
+      expect(coordinator.getRequestById(req.id)?.statusDisplayName, 'IN PROGRESS');
+
+      // 3. inProgress -> completed
+      expect(coordinator.advanceStatus(req.id), isTrue);
+      expect(coordinator.getRequestById(req.id)?.statusDisplayName, 'COMPLETED');
+
+      // Cannot advance past completed
+      expect(coordinator.advanceStatus(req.id), isFalse);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 ServicesHomeScreen Active Banner & My Requests Tests', () {
+    late ServiceCoordinator testCoordinator;
+
+    setUp(() {
+      testCoordinator = ServiceCoordinator.testInstance();
+    });
+
+    testWidgets('Does not show Active Requests card when queue is empty',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ServicesHomeScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      expect(find.text(AppStrings.activeRequestsSection), findsNothing);
+      expect(find.text(AppStrings.myRequestsTitle), findsOneWidget);
+    });
+
+    testWidgets('Shows Active Requests banner when active request exists',
+        (WidgetTester tester) async {
+      testCoordinator.marketRunRepo.createRequest(MarketRunRequest.create(
+        items: 'Apples, Bread',
+        timing: MarketRunTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ServicesHomeScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      expect(find.text('${AppStrings.activeRequestsSection} (1)'), findsOneWidget);
+      expect(find.text('MARKET RUN · REQUESTED'), findsOneWidget);
+    });
+
+    testWidgets('Tapping MY REQUESTS card navigates to MyServiceRequestsScreen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ServicesHomeScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      await tester.ensureVisible(find.text(AppStrings.myRequestsTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.myRequestsTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MyServiceRequestsScreen), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 MyServiceRequestsScreen Widget Tests', () {
+    late ServiceCoordinator testCoordinator;
+
+    setUp(() {
+      testCoordinator = ServiceCoordinator.testInstance();
+    });
+
+    testWidgets('Renders tabs and empty state when no requests exist',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MyServiceRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      expect(find.text(AppStrings.myRequestsTitle), findsOneWidget);
+      expect(find.text('${AppStrings.tabActive} (0)'), findsOneWidget);
+      expect(find.text('${AppStrings.tabHistory} (0)'), findsOneWidget);
+      expect(find.text(AppStrings.noActiveRequests), findsOneWidget);
+    });
+
+    testWidgets('Displays active requests and switches to HISTORY tab',
+        (WidgetTester tester) async {
+      testCoordinator.gasRepo.createRequest(GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+      ));
+      final pastReq = testCoordinator.maintenanceRepo.createRequest(
+        MaintenanceRequest.create(
+          description: 'Fixed kitchen tap',
+          timing: MaintenanceTiming.asSoonAsPossible,
+        ),
+      );
+      testCoordinator.maintenanceRepo.updateStatus(
+        pastReq.id,
+        MaintenanceRequestStatus.completed,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MyServiceRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Active tab shows active Gas request
+      expect(find.text('${AppStrings.tabActive} (1)'), findsOneWidget);
+      expect(find.text('${AppStrings.tabHistory} (1)'), findsOneWidget);
+      expect(find.text('COOKING GAS'), findsOneWidget);
+      expect(find.text('12.5 KG'), findsOneWidget);
+
+      // Tap HISTORY tab
+      await tester.tap(find.text('${AppStrings.tabHistory} (1)'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('MAINTENANCE'), findsOneWidget);
+      expect(find.text('Fixed kitchen tap'), findsOneWidget);
+    });
+
+    testWidgets('Tapping a request card navigates to ServiceRequestDetailScreen',
+        (WidgetTester tester) async {
+      testCoordinator.petrolRepo.createRequest(PetrolRequest.create(
+        quantity: '20 L',
+        vehicle: 'Honda Accord',
+        timing: PetrolTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MyServiceRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      await tester.tap(find.text('PETROL'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ServiceRequestDetailScreen), findsOneWidget);
+      expect(find.text(AppStrings.requestDetailTitle), findsOneWidget);
+      expect(find.text('20 L · Honda Accord'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 ServiceRequestDetailScreen Widget Tests', () {
+    late ServiceCoordinator testCoordinator;
+
+    setUp(() {
+      testCoordinator = ServiceCoordinator.testInstance();
+    });
+
+    testWidgets('Displays timeline nodes, full request details, and cancel action',
+        (WidgetTester tester) async {
+      final req = testCoordinator.groceryRepo.createRequest(GroceryRequest.create(
+        items: 'Eggs, Bread, Butter',
+        timing: GroceryTiming.asSoonAsPossible,
+        notes: 'Ring the bell twice',
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ServiceRequestDetailScreen(
+            request: req,
+            coordinator: testCoordinator,
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Timeline labels & status
+      expect(find.text(AppStrings.timelineStep1), findsWidgets);
+      expect(find.text(AppStrings.timelineStep2), findsOneWidget);
+      expect(find.text(AppStrings.timelineStep3), findsOneWidget);
+
+      // Metadata
+      expect(find.text('GROCERIES'), findsOneWidget);
+      expect(find.text('Eggs, Bread, Butter'), findsOneWidget);
+      expect(find.text('Ring the bell twice'), findsOneWidget);
+
+      // Cancel button is available for requested status
+      expect(find.text(AppStrings.actionCancelRequest), findsOneWidget);
+    });
+
+    testWidgets('Cancelling request via dialog updates status and shows notice',
+        (WidgetTester tester) async {
+      final req = testCoordinator.generatorRepo.createRequest(GeneratorRequest.create(
+        serviceDescription: 'Check engine oil',
+        timing: GeneratorTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ServiceRequestDetailScreen(
+            request: req,
+            coordinator: testCoordinator,
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Tap cancel request
+      await tester.ensureVisible(find.text(AppStrings.actionCancelRequest));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionCancelRequest));
+      await tester.pumpAndSettle();
+
+      // Dialog appears
+      expect(find.text(AppStrings.cancelDialogTitle), findsOneWidget);
+      expect(find.text(AppStrings.actionConfirmCancel), findsOneWidget);
+
+      // Confirm cancel
+      await tester.tap(find.text(AppStrings.actionConfirmCancel));
+      await tester.pumpAndSettle();
+
+      // Status is now cancelled, cancel button gone, cancellation notice visible
+      expect(find.text(AppStrings.requestCancelledNotice), findsOneWidget);
+      expect(find.text(AppStrings.actionCancelRequest), findsNothing);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 EstateOperationsScreen Widget Tests', () {
+    late ServiceCoordinator testCoordinator;
+
+    setUp(() {
+      testCoordinator = ServiceCoordinator.testInstance();
+    });
+
+    testWidgets('Renders filters and advances active request status',
+        (WidgetTester tester) async {
+      testCoordinator.gasRepo.createRequest(GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EstateOperationsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Header & filter chips
+      expect(find.text(AppStrings.operationsDeskTitle), findsOneWidget);
+      expect(find.text(AppStrings.filterAll), findsOneWidget);
+      expect(find.text('COOKING GAS'), findsOneWidget);
+      expect(find.text(AppStrings.actionAdvanceStatus), findsOneWidget);
+
+      // Advance status
+      await tester.tap(find.text(AppStrings.actionAdvanceStatus));
+      await tester.pumpAndSettle();
+
+      // Request is now ASSIGNED
+      expect(find.text('ASSIGNED'), findsOneWidget);
+      expect(find.text(AppStrings.statusUpdatedNotice), findsOneWidget);
+    });
+
+    testWidgets('Filtering by COMPLETED shows empty queue when none completed',
+        (WidgetTester tester) async {
+      testCoordinator.marketRunRepo.createRequest(MarketRunRequest.create(
+        items: 'Fresh bread',
+        timing: MarketRunTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: EstateOperationsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Tap COMPLETED filter
+      await tester.tap(find.text('COMPLETED'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('QUEUE IS EMPTY'), findsOneWidget);
+    });
+  });
 }
+
 
 
 

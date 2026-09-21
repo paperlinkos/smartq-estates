@@ -15,6 +15,13 @@ abstract class MarketRunRepository {
   /// Retrieves a specific request by its [id], or null if not found.
   MarketRunRequest? getRequestById(String id);
 
+  /// Updates the operational status of a request.
+  MarketRunRequest? updateStatus(String id, MarketRunStatus newStatus);
+
+  /// Cancels a request if it is still in the `requested` intake state.
+  /// Returns true if cancelled, false otherwise.
+  bool cancelRequest(String id);
+
   /// Clears stored requests (primarily for test suite isolation).
   void clear();
 }
@@ -49,6 +56,26 @@ class LocalMarketRunRepository implements MarketRunRepository {
   MarketRunRequest? getRequestById(String id) {
     final matches = _requests.where((r) => r.id == id);
     return matches.isNotEmpty ? matches.first : null;
+  }
+
+  @override
+  MarketRunRequest? updateStatus(String id, MarketRunStatus newStatus) {
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index == -1) return null;
+    final updated = _requests[index].copyWith(status: newStatus);
+    _requests[index] = updated;
+    return updated;
+  }
+
+  @override
+  bool cancelRequest(String id) {
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index == -1) return false;
+    if (_requests[index].status != MarketRunStatus.requested) {
+      return false; // Only intake state can be cancelled by resident
+    }
+    _requests[index] = _requests[index].copyWith(status: MarketRunStatus.cancelled);
+    return true;
   }
 
   @override

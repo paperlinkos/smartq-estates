@@ -15,6 +15,13 @@ abstract class MaintenanceRepository {
   /// Retrieves a specific request by its [id], or null if not found.
   MaintenanceRequest? getRequestById(String id);
 
+  /// Updates the operational status of a request.
+  MaintenanceRequest? updateStatus(String id, MaintenanceRequestStatus newStatus);
+
+  /// Cancels a request if it is still in the `requested` intake state.
+  /// Returns true if cancelled, false otherwise.
+  bool cancelRequest(String id);
+
   /// Clears stored requests (primarily for test suite isolation).
   void clear();
 }
@@ -51,6 +58,26 @@ class LocalMaintenanceRepository implements MaintenanceRepository {
   MaintenanceRequest? getRequestById(String id) {
     final matches = _requests.where((r) => r.id == id);
     return matches.isNotEmpty ? matches.first : null;
+  }
+
+  @override
+  MaintenanceRequest? updateStatus(String id, MaintenanceRequestStatus newStatus) {
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index == -1) return null;
+    final updated = _requests[index].copyWith(status: newStatus);
+    _requests[index] = updated;
+    return updated;
+  }
+
+  @override
+  bool cancelRequest(String id) {
+    final index = _requests.indexWhere((r) => r.id == id);
+    if (index == -1) return false;
+    if (_requests[index].status != MaintenanceRequestStatus.requested) {
+      return false;
+    }
+    _requests[index] = _requests[index].copyWith(status: MaintenanceRequestStatus.cancelled);
+    return true;
   }
 
   @override

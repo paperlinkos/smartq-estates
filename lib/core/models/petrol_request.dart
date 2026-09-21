@@ -1,3 +1,5 @@
+import 'service_request_item.dart';
+
 /// The timing preference specified by the resident for their petrol delivery.
 enum PetrolTiming {
   asSoonAsPossible,
@@ -17,7 +19,6 @@ enum PetrolTiming {
 }
 
 /// The operational status of a petrol delivery request.
-/// In Phase 6E, only [requested] is actively used. Other states are reserved for future phases.
 enum PetrolRequestStatus {
   requested,
   assigned,
@@ -45,8 +46,9 @@ enum PetrolRequestStatus {
 }
 
 /// A structured model representing a resident's request for petrol delivery.
-class PetrolRequest {
+class PetrolRequest implements ServiceRequestItem {
   /// Unique request identifier (e.g. 'PETROL-1710000000000').
+  @override
   final String id;
 
   /// The fuel quantity (e.g. '20 L' or custom entered liters).
@@ -65,15 +67,18 @@ class PetrolRequest {
   final DateTime? scheduledFor;
 
   /// Delivery location identifier or structured key.
+  @override
   final String deliveryLocation;
 
   /// Optional instructions or notes for delivery.
+  @override
   final String? notes;
 
   /// Operational status of the request.
   final PetrolRequestStatus status;
 
   /// Timestamp when the request was submitted.
+  @override
   final DateTime createdAt;
 
   const PetrolRequest({
@@ -115,4 +120,92 @@ class PetrolRequest {
       createdAt: now,
     );
   }
+
+  /// Creates a copy with modified values.
+  PetrolRequest copyWith({
+    String? quantity,
+    bool? isCustom,
+    String? vehicle,
+    PetrolTiming? timing,
+    DateTime? scheduledFor,
+    String? deliveryLocation,
+    String? notes,
+    PetrolRequestStatus? status,
+  }) {
+    return PetrolRequest(
+      id: id,
+      quantity: quantity ?? this.quantity,
+      isCustom: isCustom ?? this.isCustom,
+      vehicle: vehicle ?? this.vehicle,
+      timing: timing ?? this.timing,
+      scheduledFor: scheduledFor ?? this.scheduledFor,
+      deliveryLocation: deliveryLocation ?? this.deliveryLocation,
+      notes: notes ?? this.notes,
+      status: status ?? this.status,
+      createdAt: createdAt,
+    );
+  }
+
+  // ── ServiceRequestItem Implementation ──────────────────────────────────────
+
+  @override
+  String get serviceTitle => 'PETROL';
+
+  @override
+  String get serviceType => 'petrol';
+
+  @override
+  String get summaryText =>
+      vehicle != null && vehicle!.isNotEmpty ? '$quantity · $vehicle' : quantity;
+
+  @override
+  String get timingDisplay {
+    switch (timing) {
+      case PetrolTiming.asSoonAsPossible:
+        return 'AS SOON AS POSSIBLE';
+      case PetrolTiming.laterToday:
+        return 'LATER TODAY';
+      case PetrolTiming.scheduled:
+        if (scheduledFor != null) {
+          const months = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+          ];
+          final hour = scheduledFor!.hour == 0
+              ? 12
+              : (scheduledFor!.hour > 12 ? scheduledFor!.hour - 12 : scheduledFor!.hour);
+          final period = scheduledFor!.hour >= 12 ? 'PM' : 'AM';
+          final minute = scheduledFor!.minute.toString().padLeft(2, '0');
+          return '${scheduledFor!.day} ${months[scheduledFor!.month - 1]}, ${scheduledFor!.year} · $hour:$minute $period';
+        }
+        return 'SCHEDULED';
+    }
+  }
+
+  @override
+  String get statusDisplayName => status.displayName;
+
+  @override
+  ServiceOperationalPhase get operationalPhase {
+    switch (status) {
+      case PetrolRequestStatus.requested:
+        return ServiceOperationalPhase.requested;
+      case PetrolRequestStatus.assigned:
+      case PetrolRequestStatus.refuelling:
+      case PetrolRequestStatus.outForDelivery:
+        return ServiceOperationalPhase.inProgress;
+      case PetrolRequestStatus.delivered:
+        return ServiceOperationalPhase.completed;
+      case PetrolRequestStatus.cancelled:
+        return ServiceOperationalPhase.cancelled;
+    }
+  }
+
+  @override
+  bool get isActive =>
+      status != PetrolRequestStatus.delivered &&
+      status != PetrolRequestStatus.cancelled;
+
+  @override
+  bool get canBeCancelled => status == PetrolRequestStatus.requested;
 }

@@ -9,7 +9,9 @@ import '../core/models/grocery_request.dart';
 import '../core/models/maintenance_request.dart';
 import '../core/models/market_run_request.dart';
 import '../core/models/petrol_request.dart';
+import '../core/models/service_request_item.dart';
 import '../core/models/visitor_pass.dart';
+import '../screens/operations/estate_operations_screen.dart';
 import '../screens/estate_selection/estate_selection_screen.dart';
 import '../screens/main_shell/main_shell_screen.dart';
 import '../screens/maintenance/maintenance_placeholder_screen.dart';
@@ -28,8 +30,10 @@ import '../screens/services/maintenance_screen.dart';
 import '../screens/services/maintenance_requested_screen.dart';
 import '../screens/services/market_run_screen.dart';
 import '../screens/services/market_run_requested_screen.dart';
+import '../screens/services/my_service_requests_screen.dart';
 import '../screens/services/petrol_screen.dart';
 import '../screens/services/petrol_requested_screen.dart';
+import '../screens/services/service_request_detail_screen.dart';
 import '../screens/services/services_home_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/visitors/create_event_screen.dart';
@@ -68,6 +72,11 @@ class AppRouter {
   static const String serviceMaintenance = '/services/maintenance';
   static const String serviceMaintenanceRequested =
       '/services/maintenance/requested';
+
+  // Phase 7 Service Request Lifecycle & Operations
+  static const String myServiceRequests = '/services/my-requests';
+  static const String serviceRequestDetail = '/services/request-detail';
+  static const String estateOperations = '/operations/services';
 
   // Visitors action routes
   static const String inviteSomeone = '/visitors/invite';
@@ -210,6 +219,22 @@ class AppRouter {
         final request = settings.arguments as MaintenanceRequest;
         return MaterialPageRoute(
           builder: (_) => MaintenanceRequestedScreen(request: request),
+          settings: settings,
+        );
+      case myServiceRequests:
+        return MaterialPageRoute(
+          builder: (_) => const MyServiceRequestsScreen(),
+          settings: settings,
+        );
+      case serviceRequestDetail:
+        final request = settings.arguments as ServiceRequestItem;
+        return MaterialPageRoute(
+          builder: (_) => ServiceRequestDetailScreen(request: request),
+          settings: settings,
+        );
+      case estateOperations:
+        return MaterialPageRoute(
+          builder: (_) => const EstateOperationsScreen(),
           settings: settings,
         );
       case maintenance:

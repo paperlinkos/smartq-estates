@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
+import '../../core/services/service_coordinator.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_header.dart';
 
-/// The Resident Services Home screen for Phase 6A.
+/// The Resident Services Home screen.
 ///
-/// Gives residents a simple, uncluttered hub to request estate-related services.
-/// Adheres to the "WHAT DO YOU NEED?" aesthetic with 6 focused single-column service cards.
-class ServicesHomeScreen extends StatelessWidget {
-  const ServicesHomeScreen({super.key});
+/// Gives residents a simple, uncluttered hub to request estate-related services
+/// and track active/historical requests.
+class ServicesHomeScreen extends StatefulWidget {
+  final ServiceCoordinator? coordinator;
+
+  const ServicesHomeScreen({
+    super.key,
+    this.coordinator,
+  });
+
+  @override
+  State<ServicesHomeScreen> createState() => _ServicesHomeScreenState();
+}
+
+class _ServicesHomeScreenState extends State<ServicesHomeScreen> {
+  ServiceCoordinator get _coordinator =>
+      widget.coordinator ?? ServiceCoordinator.instance;
 
   @override
   Widget build(BuildContext context) {
+    final activeRequests = _coordinator.getActiveRequests();
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppHeader(
@@ -28,6 +44,73 @@ class ServicesHomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Active Requests Banner (If Any) ─────────────────────────
+              if (activeRequests.isNotEmpty) ...[
+                AppCard(
+                  onTap: () async {
+                    await Navigator.of(context)
+                        .pushNamed(AppRouter.myServiceRequests);
+                    setState(() {});
+                  },
+                  backgroundColor: AppColors.black,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.white.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.schedule_rounded,
+                            size: 20,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${AppStrings.activeRequestsSection} (${activeRequests.length})',
+                              style: const TextStyle(
+                                color: AppColors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${activeRequests.first.serviceTitle} · ${activeRequests.first.statusDisplayName}',
+                              style: TextStyle(
+                                color: AppColors.white.withValues(alpha: 0.8),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: AppColors.white,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+
               // ── Section Heading ─────────────────────────────────────────
               const Text(
                 AppStrings.servicesQuestion,
@@ -55,8 +138,10 @@ class ServicesHomeScreen extends StatelessWidget {
                 title: AppStrings.marketRunTitle,
                 subtitle: AppStrings.marketRunSubtitle,
                 icon: Icons.shopping_bag_outlined,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRouter.marketRun),
+                onTap: () async {
+                  await Navigator.of(context).pushNamed(AppRouter.marketRun);
+                  setState(() {});
+                },
               ),
 
               const SizedBox(height: 12),
@@ -66,8 +151,10 @@ class ServicesHomeScreen extends StatelessWidget {
                 title: AppStrings.groceriesTitle,
                 subtitle: AppStrings.groceriesSubtitle,
                 icon: Icons.shopping_basket_outlined,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRouter.groceries),
+                onTap: () async {
+                  await Navigator.of(context).pushNamed(AppRouter.groceries);
+                  setState(() {});
+                },
               ),
 
               const SizedBox(height: 12),
@@ -77,8 +164,10 @@ class ServicesHomeScreen extends StatelessWidget {
                 title: AppStrings.gasTitle,
                 subtitle: AppStrings.gasSubtitle,
                 icon: Icons.propane_tank_outlined,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRouter.gas),
+                onTap: () async {
+                  await Navigator.of(context).pushNamed(AppRouter.gas);
+                  setState(() {});
+                },
               ),
 
               const SizedBox(height: 12),
@@ -88,8 +177,10 @@ class ServicesHomeScreen extends StatelessWidget {
                 title: AppStrings.petrolTitle,
                 subtitle: AppStrings.petrolSubtitle,
                 icon: Icons.local_gas_station_outlined,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRouter.petrol),
+                onTap: () async {
+                  await Navigator.of(context).pushNamed(AppRouter.petrol);
+                  setState(() {});
+                },
               ),
 
               const SizedBox(height: 12),
@@ -99,8 +190,10 @@ class ServicesHomeScreen extends StatelessWidget {
                 title: AppStrings.generatorTitle,
                 subtitle: AppStrings.generatorSubtitle,
                 icon: Icons.electric_bolt_outlined,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRouter.generator),
+                onTap: () async {
+                  await Navigator.of(context).pushNamed(AppRouter.generator);
+                  setState(() {});
+                },
               ),
 
               const SizedBox(height: 12),
@@ -110,8 +203,74 @@ class ServicesHomeScreen extends StatelessWidget {
                 title: AppStrings.maintenanceTitle,
                 subtitle: AppStrings.maintenanceSubtitle,
                 icon: Icons.build_outlined,
-                onTap: () =>
-                    Navigator.of(context).pushNamed(AppRouter.serviceMaintenance),
+                onTap: () async {
+                  await Navigator.of(context)
+                      .pushNamed(AppRouter.serviceMaintenance);
+                  setState(() {});
+                },
+              ),
+
+              const SizedBox(height: 20),
+
+              // ── MY REQUESTS LINK ────────────────────────────────────────
+              AppCard(
+                onTap: () async {
+                  await Navigator.of(context)
+                      .pushNamed(AppRouter.myServiceRequests);
+                  setState(() {});
+                },
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 18.0, vertical: 16.0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.gray100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.receipt_long_outlined,
+                          size: 22,
+                          color: AppColors.black,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppStrings.myRequestsTitle,
+                            style: TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            AppStrings.myRequestsSubtitle,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: AppColors.gray400,
+                    ),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 24),
