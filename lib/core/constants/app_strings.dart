@@ -297,5 +297,19 @@ class AppStrings {
   static const String labelWhatYouAskedFor = 'WHAT YOU ASKED FOR';
   static const String labelWhen = 'WHEN';
   static const String labelNotes = 'NOTES';
+
+  // Phase 6C — Groceries Request
+  static const String groceriesHeaderSubtitle =
+      'GET EVERYDAY ESSENTIALS DELIVERED.';
+  static const String groceriesQuestion = 'WHAT DO YOU NEED?';
+  static const String groceriesQuestionSubtitle =
+      'List the grocery items you want delivered to your home.';
+  static const String hintGroceriesItems =
+      'e.g. Bread, milk, eggs, cereal and cooking oil.';
+  static const String hintGroceriesNotes =
+      'Anything else the delivery person should know.';
+  static const String actionRequestGroceries = 'REQUEST GROCERIES';
+  static const String groceriesRequestReceivedSubtitle =
+      "We've received your groceries request.";
 }
 

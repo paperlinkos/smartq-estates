@@ -50,6 +50,11 @@ import 'package:smartq_estates/core/models/market_run_request.dart';
 import 'package:smartq_estates/core/repositories/market_run_repository.dart';
 import 'package:smartq_estates/screens/services/market_run_screen.dart';
 import 'package:smartq_estates/screens/services/market_run_requested_screen.dart';
+// Phase 6C imports
+import 'package:smartq_estates/core/models/grocery_request.dart';
+import 'package:smartq_estates/core/repositories/grocery_repository.dart';
+import 'package:smartq_estates/screens/services/groceries_screen.dart';
+import 'package:smartq_estates/screens/services/groceries_requested_screen.dart';
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -2131,9 +2136,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
 
-      // Remaining 5 services navigate to placeholder screens
-      await testCardNavigation(AppStrings.groceriesTitle,
-          services_placeholders.GroceriesPlaceholderScreen);
+      // Groceries navigates to GroceriesScreen (Phase 6C)
+      await tester.ensureVisible(find.text(AppStrings.groceriesTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.groceriesTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(GroceriesScreen), findsOneWidget);
+      final groceriesBackButton = find.descendant(
+        of: find.byType(GroceriesScreen),
+        matching: find.byIcon(Icons.arrow_back),
+      );
+      await tester.tap(groceriesBackButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Remaining 4 services navigate to placeholder screens
       await testCardNavigation(
           AppStrings.gasTitle, services_placeholders.GasPlaceholderScreen);
       await testCardNavigation(AppStrings.petrolTitle,
@@ -2573,6 +2590,409 @@ void main() {
       // Returns to ServicesHomeScreen
       expect(find.byType(MarketRunRequestedScreen), findsNothing);
       expect(find.byType(MarketRunScreen), findsNothing);
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6C GroceryRequest Model Tests', () {
+    test('GroceryRequest.create initializes defaults and fields', () {
+      final req = GroceryRequest.create(
+        items: 'Milk, Eggs, Bread, Butter',
+        timing: GroceryTiming.asSoonAsPossible,
+      );
+
+      expect(req.id.startsWith('GR-'), isTrue);
+      expect(req.items, 'Milk, Eggs, Bread, Butter');
+      expect(req.timing, GroceryTiming.asSoonAsPossible);
+      expect(req.scheduledFor, isNull);
+      expect(req.deliveryLocation, 'estateAddress');
+      expect(req.notes, isNull);
+      expect(req.status, GroceryRequestStatus.requested);
+      expect(req.createdAt, isNotNull);
+    });
+
+    test('GroceryRequest supports scheduled timing and optional notes', () {
+      final scheduledTime = DateTime.now().add(const Duration(days: 2));
+      final req = GroceryRequest.create(
+        items: 'Cornflakes, Oat Milk, Orange Juice',
+        timing: GroceryTiming.scheduled,
+        scheduledFor: scheduledTime,
+        notes: 'Leave at the doorstep',
+      );
+
+      expect(req.items, 'Cornflakes, Oat Milk, Orange Juice');
+      expect(req.timing, GroceryTiming.scheduled);
+      expect(req.scheduledFor, scheduledTime);
+      expect(req.notes, 'Leave at the doorstep');
+      expect(req.status, GroceryRequestStatus.requested);
+    });
+
+    test('GroceryTiming enum has expected values', () {
+      expect(GroceryTiming.values, containsAll([
+        GroceryTiming.asSoonAsPossible,
+        GroceryTiming.laterToday,
+        GroceryTiming.scheduled,
+      ]));
+    });
+
+    test('GroceryRequestStatus enum has expected values', () {
+      expect(GroceryRequestStatus.values, containsAll([
+        GroceryRequestStatus.requested,
+        GroceryRequestStatus.assigned,
+        GroceryRequestStatus.shopping,
+        GroceryRequestStatus.outForDelivery,
+        GroceryRequestStatus.delivered,
+        GroceryRequestStatus.cancelled,
+      ]));
+    });
+  });
+
+  group('SmartQ Estates - Phase 6C GroceryRepository Tests', () {
+    late LocalGroceryRepository repo;
+
+    setUp(() {
+      repo = LocalGroceryRepository.testInstance();
+    });
+
+    test('createRequest stores and returns request', () {
+      final req = GroceryRequest.create(
+        items: 'Apples, Bananas',
+        timing: GroceryTiming.asSoonAsPossible,
+      );
+
+      final created = repo.createRequest(req);
+      expect(created.id, req.id);
+      expect(repo.getRequests().length, 1);
+      expect(repo.getRequests().first.id, req.id);
+    });
+
+    test('getRequests returns requests sorted by createdAt descending', () {
+      final first = GroceryRequest.create(
+        items: 'First Grocery Item',
+        timing: GroceryTiming.laterToday,
+        createdAt: DateTime(2026, 1, 1, 10, 0),
+      );
+      final second = GroceryRequest.create(
+        items: 'Second Grocery Item',
+        timing: GroceryTiming.asSoonAsPossible,
+        createdAt: DateTime(2026, 1, 1, 11, 0),
+      );
+
+      repo.createRequest(first);
+      repo.createRequest(second);
+
+      final list = repo.getRequests();
+      expect(list.length, 2);
+      expect(list[0].id, second.id);
+      expect(list[1].id, first.id);
+    });
+
+    test('getRequestById returns matching request or null', () {
+      final req = GroceryRequest.create(
+        items: 'Cereal and Almond Milk',
+        timing: GroceryTiming.asSoonAsPossible,
+      );
+      repo.createRequest(req);
+
+      expect(repo.getRequestById(req.id)?.items, 'Cereal and Almond Milk');
+      expect(repo.getRequestById('NON-EXISTENT'), isNull);
+    });
+
+    test('clear removes all requests', () {
+      repo.createRequest(GroceryRequest.create(
+        items: 'Cheese and Crackers',
+        timing: GroceryTiming.laterToday,
+      ));
+      expect(repo.getRequests().length, 1);
+
+      repo.clear();
+      expect(repo.getRequests(), isEmpty);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6C GroceriesScreen Widget Tests', () {
+    late LocalGroceryRepository testRepo;
+
+    setUp(() {
+      testRepo = LocalGroceryRepository.testInstance();
+    });
+
+    testWidgets('GroceriesScreen renders header, subtitle, question, and inputs',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesScreen(repository: testRepo),
+        ),
+      );
+
+      // Header & Subtitle
+      expect(find.text(AppStrings.groceriesTitle), findsOneWidget);
+      expect(find.text(AppStrings.groceriesHeaderSubtitle), findsOneWidget);
+
+      // Question section
+      expect(find.text(AppStrings.groceriesQuestion), findsOneWidget);
+      expect(find.text(AppStrings.groceriesQuestionSubtitle), findsOneWidget);
+
+      // Multiline items input
+      expect(find.text(AppStrings.labelItems), findsOneWidget);
+      expect(find.text(AppStrings.hintGroceriesItems), findsOneWidget);
+
+      // Timing options
+      expect(find.text(AppStrings.timingHeading), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+      expect(find.text(AppStrings.timingSchedule), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes (optional)
+      expect(find.text(AppStrings.labelNotesOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintGroceriesNotes), findsOneWidget);
+
+      // Submit button
+      expect(find.text(AppStrings.actionRequestGroceries), findsOneWidget);
+    });
+
+    testWidgets('Submitting with empty items displays error message',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesScreen(repository: testRepo),
+        ),
+      );
+
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorItemsRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Can select timing options: ASAP, LATER TODAY, SCHEDULE',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesScreen(repository: testRepo),
+        ),
+      );
+
+      // Default is ASAP
+      // Select LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+
+      // Schedule pickers should not be shown yet
+      expect(find.text('Select Date'), findsNothing);
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Schedule pickers should now appear
+      expect(find.text('Select Date'), findsOneWidget);
+      expect(find.text('Select Time'), findsOneWidget);
+    });
+
+    testWidgets('SCHEDULE without choosing date/time displays error when submitting',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesScreen(repository: testRepo),
+        ),
+      );
+
+      // Enter valid items
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGroceriesItems),
+        'Bread, Eggs, Butter, Jam',
+      );
+      await tester.pumpAndSettle();
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Tap submit without setting date/time
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorScheduledRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Valid submission saves request to repo and navigates to requested screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Enter items
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGroceriesItems),
+        'Fresh Milk, Sliced Bread, Brown Eggs',
+      );
+      await tester.pumpAndSettle();
+
+      // Enter optional notes
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintGroceriesNotes));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGroceriesNotes),
+        'Whole milk preferred.',
+      );
+      await tester.pumpAndSettle();
+
+      // Tap submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+
+      // Verify request in repository
+      final requests = testRepo.getRequests();
+      expect(requests.length, 1);
+      expect(requests.first.items, 'Fresh Milk, Sliced Bread, Brown Eggs');
+      expect(requests.first.notes, 'Whole milk preferred.');
+      expect(requests.first.timing, GroceryTiming.asSoonAsPossible);
+      expect(requests.first.status, GroceryRequestStatus.requested);
+
+      // Verify transition to GroceriesRequestedScreen
+      expect(find.byType(GroceriesRequestedScreen), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.groceriesRequestReceivedSubtitle), findsOneWidget);
+      expect(find.text('Fresh Milk, Sliced Bread, Brown Eggs'), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+      expect(find.text('Whole milk preferred.'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6C GroceriesRequestedScreen Tests', () {
+    testWidgets('Displays all request details and notes when provided',
+        (WidgetTester tester) async {
+      final request = GroceryRequest.create(
+        items: 'Avocados, Spinach, Greek Yogurt',
+        timing: GroceryTiming.laterToday,
+        notes: 'Ring bell upon arrival.',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesRequestedScreen(request: request),
+        ),
+      );
+
+      // Header & subtitle
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.groceriesRequestReceivedSubtitle), findsOneWidget);
+
+      // What you asked for
+      expect(find.text(AppStrings.labelWhatYouAskedFor), findsOneWidget);
+      expect(find.text('Avocados, Spinach, Greek Yogurt'), findsOneWidget);
+
+      // When
+      expect(find.text(AppStrings.labelWhen), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes
+      expect(find.text(AppStrings.labelNotes), findsOneWidget);
+      expect(find.text('Ring bell upon arrival.'), findsOneWidget);
+
+      // Done button
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('Does not display notes section when notes are null or empty',
+        (WidgetTester tester) async {
+      final request = GroceryRequest.create(
+        items: 'Orange Juice 1L',
+        timing: GroceryTiming.asSoonAsPossible,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GroceriesRequestedScreen(request: request),
+        ),
+      );
+
+      expect(find.text(AppStrings.labelWhatYouAskedFor), findsOneWidget);
+      expect(find.text(AppStrings.labelNotes), findsNothing);
+    });
+
+    testWidgets('DONE button returns to Services Home',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouter.services),
+                child: const Text('GO TO SERVICES'),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Open ServicesHomeScreen with named route
+      await tester.tap(find.text('GO TO SERVICES'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Navigate to GroceriesScreen
+      await tester.ensureVisible(find.text(AppStrings.groceriesTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.groceriesTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GroceriesScreen), findsOneWidget);
+
+      // Enter items
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGroceriesItems),
+        'Apples and Pears',
+      );
+      await tester.pumpAndSettle();
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGroceries));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GroceriesRequestedScreen), findsOneWidget);
+
+      // Tap DONE
+      await tester.ensureVisible(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+
+      // Returns to ServicesHomeScreen
+      expect(find.byType(GroceriesRequestedScreen), findsNothing);
+      expect(find.byType(GroceriesScreen), findsNothing);
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
   });
