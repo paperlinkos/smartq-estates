@@ -72,8 +72,9 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
 
     final payload = DecodedQrPayload.parse(rawValue);
 
+    // Phase 5C: Route to AccessResultScreen which runs full pass verification.
     Navigator.of(context).pushNamed(
-      AppRouter.scanResult,
+      AppRouter.accessResult,
       arguments: payload,
     ).then((_) {
       // Upon returning to the scanner screen, reset navigation state and restart camera
@@ -85,6 +86,7 @@ class _VerifyAccessScannerScreenState extends State<VerifyAccessScannerScreen> w
       }
     });
   }
+
 
   Future<void> _toggleTorch() async {
     try {

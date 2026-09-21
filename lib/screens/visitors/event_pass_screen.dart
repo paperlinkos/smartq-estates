@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/models/event_pass.dart';
 import '../../core/models/visitor_pass.dart'; // PassStatus
+import '../../core/repositories/pass_registry.dart';
 import '../../widgets/app_button.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_header.dart';
@@ -109,8 +110,11 @@ class _EventPassScreenState extends State<EventPassScreen> {
     );
 
     if (shouldCancel == true) {
+      final cancelled = _pass.copyWith(status: PassStatus.cancelled);
+      // Sync cancellation to the registry so Security reflects the change.
+      LocalPassRegistry.instance.updateEventPass(cancelled);
       setState(() {
-        _pass = _pass.copyWith(status: PassStatus.cancelled);
+        _pass = cancelled;
       });
     }
   }

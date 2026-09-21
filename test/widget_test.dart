@@ -33,6 +33,12 @@ import 'package:smartq_estates/navigation/app_router.dart';
 import 'package:smartq_estates/widgets/app_button.dart';
 import 'package:smartq_estates/widgets/app_header.dart';
 import 'package:smartq_estates/widgets/app_text_field.dart';
+// Phase 5C imports
+import 'package:smartq_estates/core/models/pass_verification_result.dart';
+import 'package:smartq_estates/core/repositories/pass_registry.dart';
+import 'package:smartq_estates/core/services/pass_verification_service.dart';
+import 'package:smartq_estates/screens/security/access_result_screen.dart';
+
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -1127,4 +1133,512 @@ void main() {
       expect(find.text('ALLOW ENTRY'), findsNothing);
     });
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Phase 5C — Pass Verification + Access Decision
+  // ─────────────────────────────────────────────────────────────────────────
+
+  group('SmartQ Estates - Phase 5C PassRegistry Tests', () {
+    final testInvitation = VisitorInvitation(
+      id: 'inv_reg_01',
+      visitorName: 'Emeka Okafor',
+      phoneNumber: '08011112222',
+      visitDate: DateTime.now().add(const Duration(hours: 2)),
+      arrivalTime: TimeOfDay.now(),
+      createdAt: DateTime.now(),
+    );
+
+    test('Register and find visitor pass', () {
+      final registry = LocalPassRegistry.testInstance();
+      final pass = MockQrCodeService().createVisitorPass(invitation: testInvitation);
+      registry.registerVisitorPass(pass);
+
+      final found = registry.findVisitorPass(pass.passId);
+      expect(found, isNotNull);
+      expect(found!.passId, equals(pass.passId));
+    });
+
+    test('Find unknown passId returns null for visitor', () {
+      final registry = LocalPassRegistry.testInstance();
+      final found = registry.findVisitorPass('BT-NONEXISTENT');
+      expect(found, isNull);
+    });
+
+    test('Register and find event pass', () {
+      final registry = LocalPassRegistry.testInstance();
+      final event = EstateEvent(
+        id: 'evt_reg_01',
+        name: 'Test Event',
+        eventDate: DateTime.now().add(const Duration(hours: 3)),
+        startTime: const TimeOfDay(hour: 18, minute: 0),
+        endTime: const TimeOfDay(hour: 22, minute: 0),
+        expectedGuests: 20,
+        createdAt: DateTime.now(),
+      );
+      final pass = MockQrCodeService().createEventPass(event: event);
+      registry.registerEventPass(pass);
+
+      final found = registry.findEventPass(pass.passId);
+      expect(found, isNotNull);
+      expect(found!.passId, equals(pass.passId));
+    });
+
+    test('Find unknown passId returns null for event', () {
+      final registry = LocalPassRegistry.testInstance();
+      final found = registry.findEventPass('EP-NONEXISTENT');
+      expect(found, isNull);
+    });
+
+    test('updateVisitorPass reflects new status on lookup', () {
+      final registry = LocalPassRegistry.testInstance();
+      final pass = MockQrCodeService().createVisitorPass(invitation: testInvitation);
+      registry.registerVisitorPass(pass);
+
+      final cancelled = pass.copyWith(status: PassStatus.cancelled);
+      registry.updateVisitorPass(cancelled);
+
+      final found = registry.findVisitorPass(pass.passId);
+      expect(found!.status, equals(PassStatus.cancelled));
+    });
+  });
+
+  group('SmartQ Estates - Phase 5C PassVerificationService Tests', () {
+    PassVerificationService makeService(LocalPassRegistry registry) {
+      return LocalPassVerificationService(registry: registry);
+    }
+
+    final baseInvitation = VisitorInvitation(
+      id: 'inv_v_01',
+      visitorName: 'Ada Lovelace',
+      phoneNumber: '08099001122',
+      visitDate: DateTime.now(),
+      arrivalTime: TimeOfDay(
+        hour: DateTime.now().hour,
+        minute: DateTime.now().minute,
+      ),
+      createdAt: DateTime.now(),
+    );
+
+    final futureEvent = EstateEvent(
+      id: 'evt_v_01',
+      name: 'Verification Test Event',
+      eventDate: DateTime.now(),
+      startTime: TimeOfDay(
+        hour: DateTime.now().hour,
+        minute: DateTime.now().minute,
+      ),
+      endTime: TimeOfDay(
+        hour: (DateTime.now().hour + 6) % 24,
+        minute: 0,
+      ),
+      expectedGuests: 30,
+      createdAt: DateTime.now(),
+    );
+
+    test('Valid visitor pass in registry → VerificationOutcome.valid', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createVisitorPass(invitation: baseInvitation);
+      registry.registerVisitorPass(pass);
+
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.valid));
+      expect(result.isAllowed, isTrue);
+      expect(result.visitorPass, isNotNull);
+      expect(result.visitorPass!.passId, equals(pass.passId));
+    });
+
+    test('Visitor pass not in registry → VerificationOutcome.invalid', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createVisitorPass(invitation: baseInvitation);
+      // Deliberately NOT registering
+
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.invalid));
+      expect(result.isAllowed, isFalse);
+    });
+
+    test('Visitor pass with wrong token → VerificationOutcome.invalid', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createVisitorPass(invitation: baseInvitation);
+      registry.registerVisitorPass(pass);
+
+      final tamperedPayload = DecodedQrPayload(
+        rawData: pass.toQrPayload(),
+        type: QrPayloadType.visitor,
+        passId: pass.passId,
+        verificationToken: 'VT-TAMPERED',
+        rawStatus: 'active',
+        isValidFormat: true,
+        expiresAt: pass.expiresAt,
+      );
+      final result = service.verify(tamperedPayload);
+
+      expect(result.outcome, equals(VerificationOutcome.invalid));
+    });
+
+    test('Cancelled visitor pass in registry → VerificationOutcome.cancelled', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createVisitorPass(invitation: baseInvitation);
+      registry.registerVisitorPass(pass.copyWith(status: PassStatus.cancelled));
+
+      final payload = DecodedQrPayload(
+        rawData: pass.toQrPayload(),
+        type: QrPayloadType.visitor,
+        passId: pass.passId,
+        verificationToken: pass.verificationToken,
+        rawStatus: 'active', // QR says active — registry overrides
+        isValidFormat: true,
+        expiresAt: pass.expiresAt,
+      );
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.cancelled));
+    });
+
+    test('Expired visitor pass (expiresAt in past) → VerificationOutcome.expired', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final expiredInvitation = VisitorInvitation(
+        id: 'inv_expired_01',
+        visitorName: 'Old Visitor',
+        phoneNumber: '08000000001',
+        visitDate: DateTime.now().subtract(const Duration(days: 2)),
+        arrivalTime: const TimeOfDay(hour: 10, minute: 0),
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      );
+      final pass = MockQrCodeService().createVisitorPass(invitation: expiredInvitation);
+      registry.registerVisitorPass(pass);
+
+      expect(pass.expiresAt.isBefore(DateTime.now()), isTrue);
+
+      final payload = DecodedQrPayload(
+        rawData: pass.toQrPayload(),
+        type: QrPayloadType.visitor,
+        passId: pass.passId,
+        verificationToken: pass.verificationToken,
+        rawStatus: 'active',
+        isValidFormat: true,
+        expiresAt: pass.expiresAt,
+      );
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.expired));
+    });
+
+    test('Valid event pass in registry → VerificationOutcome.valid', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createEventPass(event: futureEvent);
+      registry.registerEventPass(pass);
+
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.valid));
+      expect(result.isAllowed, isTrue);
+      expect(result.eventPass, isNotNull);
+    });
+
+    test('Event pass not in registry → VerificationOutcome.invalid', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createEventPass(event: futureEvent);
+
+      final payload = DecodedQrPayload.parse(pass.toQrPayload());
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.invalid));
+    });
+
+    test('Cancelled event pass → VerificationOutcome.cancelled', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pass = MockQrCodeService().createEventPass(event: futureEvent);
+      registry.registerEventPass(pass.copyWith(status: PassStatus.cancelled));
+
+      final payload = DecodedQrPayload(
+        rawData: pass.toQrPayload(),
+        type: QrPayloadType.event,
+        passId: pass.passId,
+        verificationToken: pass.verificationToken,
+        rawStatus: 'active',
+        isValidFormat: true,
+        expiresAt: pass.expiresAt,
+      );
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.cancelled));
+    });
+
+    test('Expired event pass → VerificationOutcome.expired', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final pastEvent = EstateEvent(
+        id: 'evt_past_01',
+        name: 'Old Event',
+        eventDate: DateTime.now().subtract(const Duration(days: 2)),
+        startTime: const TimeOfDay(hour: 16, minute: 0),
+        endTime: const TimeOfDay(hour: 20, minute: 0),
+        expectedGuests: 10,
+        createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      );
+      final pass = MockQrCodeService().createEventPass(event: pastEvent);
+      registry.registerEventPass(pass);
+
+      expect(pass.expiresAt.isBefore(DateTime.now()), isTrue);
+
+      final payload = DecodedQrPayload(
+        rawData: pass.toQrPayload(),
+        type: QrPayloadType.event,
+        passId: pass.passId,
+        verificationToken: pass.verificationToken,
+        rawStatus: 'active',
+        isValidFormat: true,
+        expiresAt: pass.expiresAt,
+      );
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.expired));
+    });
+
+    test('Unrecognized QR payload → VerificationOutcome.unrecognized', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final payload = DecodedQrPayload.unrecognized('https://unknown.site/code');
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.unrecognized));
+      expect(result.isAllowed, isFalse);
+    });
+
+    test('Empty raw QR → VerificationOutcome.unrecognized', () {
+      final registry = LocalPassRegistry.testInstance();
+      final service = makeService(registry);
+      final payload = DecodedQrPayload.parse('');
+      final result = service.verify(payload);
+
+      expect(result.outcome, equals(VerificationOutcome.unrecognized));
+    });
+
+    test('VerificationOutcome helpers are correct', () {
+      expect(VerificationOutcome.valid.isAllowed, isTrue);
+      expect(VerificationOutcome.expired.isAllowed, isFalse);
+      expect(VerificationOutcome.expired.denialLabel, equals('PASS EXPIRED'));
+      expect(VerificationOutcome.cancelled.denialLabel, equals('PASS CANCELLED'));
+      expect(VerificationOutcome.invalid.denialLabel, equals('PASS COULD NOT BE VERIFIED'));
+      expect(VerificationOutcome.unrecognized.denialLabel, equals('UNRECOGNIZED QR CODE'));
+    });
+  });
+
+  group('SmartQ Estates - Phase 5C AccessResultScreen Widget Tests', () {
+    // Helper: builds AccessResultScreen with a pre-built result (bypasses live service).
+    Widget buildResultScreen(PassVerificationResult result) {
+      const payload = DecodedQrPayload(
+        rawData: '{}',
+        type: QrPayloadType.unrecognized,
+        isValidFormat: false,
+      );
+      return MaterialApp(
+        onGenerateRoute: AppRouter.onGenerateRoute,
+        home: AccessResultScreen(
+          payload: payload,
+          verificationService: _FixedResultService(result),
+        ),
+      );
+    }
+
+    final testInvitation = VisitorInvitation(
+      id: 'inv_ar_01',
+      visitorName: 'Chidinma Obi',
+      phoneNumber: '08055556666',
+      visitDate: DateTime.now().add(const Duration(hours: 1)),
+      arrivalTime: TimeOfDay.now(),
+      createdAt: DateTime.now(),
+    );
+
+    final testEvent = EstateEvent(
+      id: 'evt_ar_01',
+      name: 'Graduation Dinner',
+      eventDate: DateTime.now(),
+      startTime: TimeOfDay(
+        hour: DateTime.now().hour,
+        minute: 0,
+      ),
+      endTime: TimeOfDay(
+        hour: (DateTime.now().hour + 5) % 24,
+        minute: 0,
+      ),
+      expectedGuests: 40,
+      createdAt: DateTime.now(),
+    );
+
+    testWidgets('ACCESS ALLOWED visitor pass renders name, pass ID, DONE, SCAN AGAIN',
+        (WidgetTester tester) async {
+      final pass = MockQrCodeService().createVisitorPass(invitation: testInvitation);
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.visitor,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        visitorPass: pass,
+      );
+
+      await tester.pumpWidget(buildResultScreen(result));
+
+      expect(find.text(AppStrings.accessAllowed), findsWidgets);
+      expect(find.text('Chidinma Obi'), findsOneWidget);
+      expect(find.text(pass.passId), findsOneWidget);
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+      expect(find.text(AppStrings.scanAgainAction), findsOneWidget);
+    });
+
+    testWidgets('ACCESS ALLOWED event pass renders event name, event code, DONE, SCAN AGAIN',
+        (WidgetTester tester) async {
+      final pass = MockQrCodeService().createEventPass(event: testEvent);
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.valid,
+        passType: QrPayloadType.event,
+        passId: pass.passId,
+        verifiedAt: DateTime.now(),
+        eventPass: pass,
+      );
+
+      await tester.pumpWidget(buildResultScreen(result));
+
+      expect(find.text(AppStrings.accessAllowed), findsWidgets);
+      expect(find.text('Graduation Dinner'), findsOneWidget);
+      expect(find.text(pass.eventCode), findsOneWidget);
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+      expect(find.text(AppStrings.scanAgainAction), findsOneWidget);
+    });
+
+    testWidgets('ACCESS DENIED expired: shows PASS EXPIRED, no DONE',
+        (WidgetTester tester) async {
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.expired,
+        passType: QrPayloadType.visitor,
+        passId: 'BT-EXP01',
+        verifiedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(buildResultScreen(result));
+
+      expect(find.text(AppStrings.accessDenied), findsWidgets);
+      expect(find.text('PASS EXPIRED'), findsWidgets);
+      expect(find.text(AppStrings.scanAgainAction), findsOneWidget);
+      expect(find.text(AppStrings.doneAction), findsNothing);
+    });
+
+    testWidgets('ACCESS DENIED cancelled: shows PASS CANCELLED, no DONE',
+        (WidgetTester tester) async {
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.cancelled,
+        passType: QrPayloadType.visitor,
+        passId: 'BT-CAN01',
+        verifiedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(buildResultScreen(result));
+
+      expect(find.text(AppStrings.accessDenied), findsWidgets);
+      expect(find.text('PASS CANCELLED'), findsWidgets);
+      expect(find.text(AppStrings.scanAgainAction), findsOneWidget);
+      expect(find.text(AppStrings.doneAction), findsNothing);
+    });
+
+    testWidgets('ACCESS DENIED invalid: shows PASS COULD NOT BE VERIFIED',
+        (WidgetTester tester) async {
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.invalid,
+        passType: QrPayloadType.visitor,
+        passId: 'BT-INV01',
+        verifiedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(buildResultScreen(result));
+
+      expect(find.text(AppStrings.accessDenied), findsWidgets);
+      expect(find.text('PASS COULD NOT BE VERIFIED'), findsWidgets);
+      expect(find.text(AppStrings.scanAgainAction), findsOneWidget);
+    });
+
+    testWidgets('ACCESS DENIED unrecognized: shows UNRECOGNIZED QR CODE',
+        (WidgetTester tester) async {
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.unrecognized,
+        passType: QrPayloadType.unrecognized,
+        verifiedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(buildResultScreen(result));
+
+      expect(find.text(AppStrings.accessDenied), findsWidgets);
+      expect(find.text('UNRECOGNIZED QR CODE'), findsWidgets);
+      expect(find.text(AppStrings.scanAgainAction), findsOneWidget);
+      expect(find.text(AppStrings.doneAction), findsNothing);
+    });
+
+    testWidgets('SCAN AGAIN pops back to previous screen', (WidgetTester tester) async {
+      const payload = DecodedQrPayload(
+        rawData: '{}',
+        type: QrPayloadType.unrecognized,
+        isValidFormat: false,
+      );
+      final result = PassVerificationResult(
+        outcome: VerificationOutcome.unrecognized,
+        passType: QrPayloadType.unrecognized,
+        verifiedAt: DateTime.now(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AccessResultScreen(
+                      payload: payload,
+                      verificationService: _FixedResultService(result),
+                    ),
+                  ),
+                ),
+                child: const Text('OPEN RESULT'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('OPEN RESULT'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AccessResultScreen), findsOneWidget);
+
+      await tester.tap(find.text(AppStrings.scanAgainAction));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AccessResultScreen), findsNothing);
+      expect(find.text('OPEN RESULT'), findsOneWidget);
+    });
+  });
+}
+
+// ─── Test helpers ─────────────────────────────────────────────────────────────
+
+/// A [PassVerificationService] that always returns a pre-built result.
+/// Used in widget tests to decouple UI from registry state.
+class _FixedResultService implements PassVerificationService {
+  final PassVerificationResult _result;
+  _FixedResultService(this._result);
+
+  @override
+  PassVerificationResult verify(DecodedQrPayload payload) => _result;
 }

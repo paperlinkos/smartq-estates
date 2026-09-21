@@ -8,6 +8,7 @@ import '../screens/estate_selection/estate_selection_screen.dart';
 import '../screens/main_shell/main_shell_screen.dart';
 import '../screens/maintenance/maintenance_placeholder_screen.dart';
 import '../screens/payments/payments_placeholder_screen.dart';
+import '../screens/security/access_result_screen.dart';
 import '../screens/security/decoded_result_screen.dart';
 import '../screens/security/security_shell_screen.dart';
 import '../screens/security/verify_access_scanner_screen.dart';
@@ -45,7 +46,8 @@ class AppRouter {
   // Security routes
   static const String security = '/security';
   static const String verifyAccess = '/security/verify-access';
-  static const String scanResult = '/security/scan-result';
+  static const String scanResult = '/security/scan-result'; // Phase 5B (kept for test compatibility)
+  static const String accessResult = '/security/access-result'; // Phase 5C
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -136,6 +138,12 @@ class AppRouter {
         final payload = settings.arguments as DecodedQrPayload;
         return MaterialPageRoute(
           builder: (_) => DecodedResultScreen(payload: payload),
+          settings: settings,
+        );
+      case accessResult:
+        final payload = settings.arguments as DecodedQrPayload;
+        return MaterialPageRoute(
+          builder: (_) => AccessResultScreen(payload: payload),
           settings: settings,
         );
       default:

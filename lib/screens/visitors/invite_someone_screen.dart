@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/models/visitor_invitation.dart';
+import '../../core/repositories/pass_registry.dart';
 import '../../core/services/qr_code_service.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/app_button.dart';
@@ -180,6 +181,9 @@ class _InviteSomeoneScreenState extends State<InviteSomeoneScreen> {
 
     final qrService = MockQrCodeService();
     final pass = qrService.createVisitorPass(invitation: invitation);
+
+    // Register the pass with the local registry so Security can verify it.
+    LocalPassRegistry.instance.registerVisitorPass(pass);
 
     Navigator.of(context).pushReplacementNamed(
       AppRouter.visitorPass,

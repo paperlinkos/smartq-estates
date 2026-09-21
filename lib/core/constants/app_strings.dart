@@ -204,4 +204,27 @@ class AppStrings {
   static const String activityEmptySubtitle =
       'Your access logs, requests, and visitor entries will be tracked here.';
   static const String residentAccount = 'RESIDENT ACCOUNT';
+
+  // Phase 5C — Access Result Screen
+  static const String accessAllowed = 'ACCESS ALLOWED';
+  static const String accessDenied = 'ACCESS DENIED';
+
+  // Denied — specific reasons (displayed as secondary headline)
+  static const String resultPassExpired = 'PASS EXPIRED';
+  static const String resultPassCancelled = 'PASS CANCELLED';
+  static const String resultPassInvalid = 'PASS COULD NOT BE VERIFIED';
+  static const String resultUnrecognizedQr = 'UNRECOGNIZED QR CODE';
+
+  // Denied — supporting body text
+  static const String resultExpiredBody = 'This pass is no longer active.';
+  static const String resultCancelledBody = 'This pass has been cancelled by the resident.';
+  static const String resultInvalidBody = 'The pass is not recognized by this estate.';
+  static const String resultUnrecognizedBody = 'This QR code is not a SmartQ access pass.';
+
+  // Access Result — field labels (visitor)
+  static const String labelVisitorSection = 'VISITOR';
+  static const String labelEventSection = 'EVENT';
+  static const String labelVehicleSection = 'VEHICLE';
+  static const String labelAccessGranted = 'ACCESS GRANTED';
+  static const String backToSecurityHome = 'BACK TO SECURITY HOME';
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/models/estate_event.dart';
+import '../../core/repositories/pass_registry.dart';
 import '../../core/services/qr_code_service.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/app_button.dart';
@@ -224,6 +225,9 @@ class _CreateEventScreenState extends State<CreateEventScreen> {
     );
 
     final eventPass = MockQrCodeService().createEventPass(event: event);
+
+    // Register the event pass with the local registry so Security can verify it.
+    LocalPassRegistry.instance.registerEventPass(eventPass);
 
     Navigator.of(context).pushReplacementNamed(
       AppRouter.eventPass,
