@@ -80,6 +80,11 @@ import 'package:smartq_estates/core/services/service_coordinator.dart';
 import 'package:smartq_estates/screens/services/my_service_requests_screen.dart';
 import 'package:smartq_estates/screens/services/service_request_detail_screen.dart';
 import 'package:smartq_estates/screens/operations/estate_operations_screen.dart';
+import 'package:smartq_estates/screens/management/management_home_screen.dart';
+import 'package:smartq_estates/screens/management/management_request_detail_screen.dart';
+import 'package:smartq_estates/screens/management/management_requests_screen.dart';
+import 'package:smartq_estates/screens/management/management_shell_screen.dart';
+import 'package:smartq_estates/widgets/prototype_role_switcher.dart';
 
 
 
@@ -5428,6 +5433,277 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('QUEUE IS EMPTY'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 7 Connected Resident ↔ Management Showcase Tests', () {
+    late ServiceCoordinator testCoordinator;
+
+    setUp(() {
+      testCoordinator = ServiceCoordinator.testInstance();
+    });
+
+    testWidgets(
+        'Complete end-to-end flow: Resident creates maintenance -> Management accepts -> Resident sees IN PROGRESS -> Management completes -> Resident sees COMPLETED',
+        (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      // Step 1: Resident submits a Maintenance request: "Leaking pipe in my kitchen"
+      final createdRequest = testCoordinator.maintenanceRepo.createRequest(
+        MaintenanceRequest.create(
+          description: 'Leaking pipe in my kitchen',
+          timing: MaintenanceTiming.asSoonAsPossible,
+          deliveryLocation: 'Unit 4B • Pinecrest Royal Estate',
+        ),
+      );
+
+      expect(createdRequest.status, MaintenanceRequestStatus.requested);
+      expect(createdRequest.operationalPhase, ServiceOperationalPhase.requested);
+      expect(testCoordinator.getAllRequests().length, 1);
+
+      // Step 2: Management opens ManagementRequestsScreen
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ManagementRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: (settings) {
+            if (settings.name == AppRouter.managementRequestDetail) {
+              final req = settings.arguments as ServiceRequestItem;
+              return MaterialPageRoute(
+                builder: (_) => ManagementRequestDetailScreen(
+                  request: req,
+                  coordinator: testCoordinator,
+                ),
+              );
+            }
+            return AppRouter.onGenerateRoute(settings);
+          },
+        ),
+      );
+
+      // Verify request appears with exact description and resident info
+      expect(find.text('Leaking pipe in my kitchen'), findsOneWidget);
+      expect(find.text('MAINTENANCE'), findsOneWidget);
+      expect(find.text('John Doe • Unit 4B • Pinecrest Royal Estate'), findsOneWidget);
+      expect(find.text('REQUESTED'), findsWidgets);
+
+      // Step 3: Management taps request to open ManagementRequestDetailScreen
+      await tester.tap(find.text('Leaking pipe in my kitchen'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.managementRequestDetailTitle), findsOneWidget);
+      expect(find.text(AppStrings.actionAcceptAndStart), findsOneWidget);
+
+      // Step 4: Management taps "ACCEPT / START"
+      await tester.tap(find.text(AppStrings.actionAcceptAndStart));
+      await tester.pumpAndSettle();
+
+      // Verify status transitions to IN PROGRESS and action changes to "MARK COMPLETED"
+      expect(find.text(AppStrings.actionMarkCompleted), findsOneWidget);
+      expect(testCoordinator.getRequestById(createdRequest.id)!.operationalPhase,
+          ServiceOperationalPhase.inProgress);
+
+      // Step 5: Resident opens MyServiceRequestsScreen to check progress
+      await tester.pumpWidget(
+        MaterialApp(
+          key: UniqueKey(),
+          home: MyServiceRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Active tab shows 1 request with status IN PROGRESS
+      expect(find.text('${AppStrings.tabActive} (1)'), findsOneWidget);
+      expect(find.text('Leaking pipe in my kitchen'), findsOneWidget);
+      expect(find.text('IN PROGRESS'), findsWidgets);
+
+      // Step 6: Management re-opens request detail to finish the job
+      final inProgressReq = testCoordinator.getRequestById(createdRequest.id)!;
+      await tester.pumpWidget(
+        MaterialApp(
+          key: UniqueKey(),
+          home: ManagementRequestDetailScreen(
+            request: inProgressReq,
+            coordinator: testCoordinator,
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Step 7: Management marks the request COMPLETED
+      await tester.tap(find.text(AppStrings.actionMarkCompleted));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.statusCompletedNotice), findsOneWidget);
+      expect(testCoordinator.getRequestById(createdRequest.id)!.operationalPhase,
+          ServiceOperationalPhase.completed);
+
+      // Step 8: Resident checks MyServiceRequestsScreen again
+      await tester.pumpWidget(
+        MaterialApp(
+          key: UniqueKey(),
+          home: MyServiceRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Active tab is now 0
+      expect(find.text('${AppStrings.tabActive} (0)'), findsOneWidget);
+      expect(find.text('${AppStrings.tabHistory} (1)'), findsOneWidget);
+
+      // Tap HISTORY tab
+      await tester.tap(find.text('${AppStrings.tabHistory} (1)'));
+      await tester.pumpAndSettle();
+
+      // Request appears in History as COMPLETED
+      expect(find.text('Leaking pipe in my kitchen'), findsOneWidget);
+      expect(find.text('COMPLETED'), findsWidgets);
+    });
+
+    testWidgets('Management Requests queue displays all 6 services with filtering',
+        (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 1600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      testCoordinator.marketRunRepo.createRequest(MarketRunRequest.create(
+        items: 'Tomatoes and pepper',
+        timing: MarketRunTiming.asSoonAsPossible,
+      ));
+      testCoordinator.groceryRepo.createRequest(GroceryRequest.create(
+        items: 'Milk and cereal',
+        timing: GroceryTiming.asSoonAsPossible,
+      ));
+      testCoordinator.gasRepo.createRequest(GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+      ));
+      testCoordinator.petrolRepo.createRequest(PetrolRequest.create(
+        quantity: '20 L',
+        timing: PetrolTiming.asSoonAsPossible,
+      ));
+      testCoordinator.generatorRepo.createRequest(GeneratorRequest.create(
+        serviceDescription: 'Generator won\'t start',
+        timing: GeneratorTiming.asSoonAsPossible,
+      ));
+      testCoordinator.maintenanceRepo.createRequest(MaintenanceRequest.create(
+        description: 'AC leaking water',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      ));
+
+      expect(testCoordinator.getAllRequests().length, 6);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ManagementRequestsScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // All 6 service titles are present
+      expect(find.text('MARKET RUN'), findsOneWidget);
+      expect(find.text('GROCERIES'), findsOneWidget);
+      expect(find.text('COOKING GAS'), findsOneWidget);
+      expect(find.text('PETROL'), findsOneWidget);
+      expect(find.text('GENERATOR'), findsOneWidget);
+      expect(find.text('MAINTENANCE'), findsOneWidget);
+
+      // Filter by COMPLETED shows empty queue
+      await tester.tap(find.text(AppStrings.filterCompleted));
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.noManagementRequests), findsOneWidget);
+
+      // Filter by NEW shows all 6
+      await tester.tap(find.text(AppStrings.filterNew));
+      await tester.pumpAndSettle();
+      expect(find.text('MARKET RUN'), findsOneWidget);
+    });
+
+    testWidgets('Management Dashboard renders metrics and recent items',
+        (WidgetTester tester) async {
+      testCoordinator.generatorRepo.createRequest(GeneratorRequest.create(
+        serviceDescription: 'Service needed',
+        timing: GeneratorTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ManagementHomeScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      expect(find.text(AppStrings.managementDashboardTitle), findsOneWidget);
+      expect(find.text(AppStrings.liveOperationsQueue), findsOneWidget);
+      expect(find.text('Service needed'), findsOneWidget);
+    });
+
+    testWidgets('ManagementShellScreen switches between Dashboard, Requests, and Account tabs',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ManagementShellScreen(),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Tab 0: Management Dashboard
+      expect(find.text(AppStrings.managementDashboardSubtitle), findsOneWidget);
+
+      // Tap Tab 1: Requests
+      await tester.tap(find.text(AppStrings.tabManagementRequests));
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.managementRequestsSubtitle), findsOneWidget);
+
+      // Tap Tab 2: Account
+      await tester.tap(find.text(AppStrings.tabManagementAccount));
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.managementAccountTitle), findsOneWidget);
+      expect(find.text(AppStrings.prototypeRoleSwitcherTitle), findsOneWidget);
+    });
+
+    testWidgets('HomeScreen displays active requests banner when requests exist',
+        (WidgetTester tester) async {
+      testCoordinator.gasRepo.createRequest(GasRequest.create(
+        cylinderSize: '6 KG',
+        timing: GasTiming.asSoonAsPossible,
+      ));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: HomeScreen(coordinator: testCoordinator),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      expect(find.text('ACTIVE REQUESTS (1)'), findsOneWidget);
+      expect(find.text('TRACK'), findsOneWidget);
+    });
+
+    testWidgets('PrototypeRoleSwitcher switches between roles',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: const Scaffold(
+            body: PrototypeRoleSwitcher(currentRole: PrototypeRole.resident),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      expect(find.text(AppStrings.prototypeRoleSwitcherTitle), findsOneWidget);
+      expect(find.text(AppStrings.roleResident), findsOneWidget);
+      expect(find.text(AppStrings.roleManagement), findsOneWidget);
+      expect(find.text(AppStrings.roleSecurity), findsOneWidget);
+
+      // Tap Management
+      await tester.tap(find.text(AppStrings.roleManagement));
+      await tester.pumpAndSettle();
+
+      // Now inside ManagementShellScreen
+      expect(find.text(AppStrings.managementDashboardSubtitle), findsOneWidget);
     });
   });
 }

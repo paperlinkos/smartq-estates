@@ -2,23 +2,28 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/models/estate.dart';
+import '../../core/services/service_coordinator.dart';
 import '../../navigation/app_router.dart';
 import '../../widgets/app_card.dart';
 
 class HomeScreen extends StatelessWidget {
   final Estate? selectedEstate;
   final String residentName;
+  final ServiceCoordinator? coordinator;
 
   const HomeScreen({
     super.key,
     this.selectedEstate,
     this.residentName = AppStrings.defaultResidentName,
+    this.coordinator,
   });
 
   @override
   Widget build(BuildContext context) {
     final estateName = selectedEstate?.name ?? 'Pinecrest Royal Estate';
     final estateCode = selectedEstate?.code ?? 'PRE-01';
+    final activeRequests =
+        (coordinator ?? ServiceCoordinator.instance).getActiveRequests();
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -84,6 +89,48 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ],
               ),
+
+              if (activeRequests.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).pushNamed(AppRouter.myServiceRequests),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.black,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.sync_rounded, color: AppColors.white, size: 18),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'ACTIVE REQUESTS (${activeRequests.length})',
+                            style: const TextStyle(
+                              color: AppColors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const Text(
+                          'TRACK',
+                          style: TextStyle(
+                            color: AppColors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.4,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppColors.white),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 28),
 

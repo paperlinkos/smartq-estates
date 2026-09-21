@@ -14,6 +14,8 @@ import '../core/models/visitor_pass.dart';
 import '../screens/operations/estate_operations_screen.dart';
 import '../screens/estate_selection/estate_selection_screen.dart';
 import '../screens/main_shell/main_shell_screen.dart';
+import '../screens/management/management_request_detail_screen.dart';
+import '../screens/management/management_shell_screen.dart';
 import '../screens/maintenance/maintenance_placeholder_screen.dart';
 import '../screens/payments/payments_placeholder_screen.dart';
 import '../screens/security/access_result_screen.dart';
@@ -73,10 +75,12 @@ class AppRouter {
   static const String serviceMaintenanceRequested =
       '/services/maintenance/requested';
 
-  // Phase 7 Service Request Lifecycle & Operations
+  // Phase 7 Service Request Lifecycle & Management Operations
   static const String myServiceRequests = '/services/my-requests';
   static const String serviceRequestDetail = '/services/request-detail';
   static const String estateOperations = '/operations/services';
+  static const String management = '/management';
+  static const String managementRequestDetail = '/management/request-detail';
 
   // Visitors action routes
   static const String inviteSomeone = '/visitors/invite';
@@ -235,6 +239,18 @@ class AppRouter {
       case estateOperations:
         return MaterialPageRoute(
           builder: (_) => const EstateOperationsScreen(),
+          settings: settings,
+        );
+      case management:
+        final estate = settings.arguments as Estate?;
+        return MaterialPageRoute(
+          builder: (_) => ManagementShellScreen(initialEstate: estate),
+          settings: settings,
+        );
+      case managementRequestDetail:
+        final request = settings.arguments as ServiceRequestItem;
+        return MaterialPageRoute(
+          builder: (_) => ManagementRequestDetailScreen(request: request),
           settings: settings,
         );
       case maintenance:

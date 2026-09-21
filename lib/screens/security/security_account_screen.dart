@@ -4,6 +4,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/models/estate.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_header.dart';
+import '../../widgets/prototype_role_switcher.dart';
 
 class SecurityAccountScreen extends StatelessWidget {
   final Estate? selectedEstate;
@@ -175,6 +176,16 @@ class SecurityAccountScreen extends StatelessWidget {
                   ],
                 ),
               ),
+
+              const SizedBox(height: 24),
+
+              // Prototype Portal Switcher
+              PrototypeRoleSwitcher(
+                currentRole: PrototypeRole.security,
+                estate: selectedEstate,
+              ),
+
+              const SizedBox(height: 20),
             ],
           ),
         ),

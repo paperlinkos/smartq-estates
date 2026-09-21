@@ -2,15 +2,15 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/models/estate.dart';
-import '../../navigation/app_router.dart';
 import '../../widgets/app_card.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/prototype_role_switcher.dart';
 
-class AccountPlaceholderScreen extends StatelessWidget {
+/// Management operations profile, terminal info, and prototype role switcher screen.
+class ManagementAccountScreen extends StatelessWidget {
   final Estate? selectedEstate;
 
-  const AccountPlaceholderScreen({
+  const ManagementAccountScreen({
     super.key,
     this.selectedEstate,
   });
@@ -23,16 +23,16 @@ class AccountPlaceholderScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: const AppHeader(
-        title: AppStrings.tabAccount,
-        subtitle: 'Resident profile and preferences',
+        title: AppStrings.managementAccountTitle,
+        subtitle: AppStrings.managementAccountSubtitle,
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Resident Profile Card
+              // ── Operations Manager Profile Card ───────────────────────────
               AppCard(
                 child: Row(
                   children: [
@@ -44,32 +44,29 @@ class AccountPlaceholderScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Center(
-                        child: Text(
-                          'JD',
-                          style: TextStyle(
-                            color: AppColors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        child: Icon(
+                          Icons.admin_panel_settings_outlined,
+                          color: AppColors.white,
+                          size: 24,
                         ),
                       ),
                     ),
                     const SizedBox(width: 14),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'John Doe',
+                          Text(
+                            'Estate Operations Desk',
                             style: TextStyle(
                               color: AppColors.textPrimary,
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Unit 4B • Primary Resident',
+                          SizedBox(height: 2),
+                          Text(
+                            'Facility & Services Management',
                             style: TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
@@ -80,7 +77,8 @@ class AccountPlaceholderScreen extends StatelessWidget {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: AppColors.gray100,
                         borderRadius: BorderRadius.circular(6),
@@ -101,9 +99,9 @@ class AccountPlaceholderScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // Estate Association Info
+              // ── Assigned Estate Info ──────────────────────────────────────
               const Text(
-                'ASSIGNED COMMUNITY',
+                'ASSIGNED FACILITY',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 11.5,
@@ -115,7 +113,11 @@ class AccountPlaceholderScreen extends StatelessWidget {
               AppCard(
                 child: Row(
                   children: [
-                    const Icon(Icons.location_city_rounded, size: 22, color: AppColors.black),
+                    const Icon(
+                      Icons.location_city_rounded,
+                      size: 22,
+                      color: AppColors.black,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -131,7 +133,7 @@ class AccountPlaceholderScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Code: $estateCode',
+                            'Facility Code: $estateCode',
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 12,
@@ -146,9 +148,9 @@ class AccountPlaceholderScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // Architecture Placeholder
+              // ── System & Terminal Status ──────────────────────────────────
               const Text(
-                'PREFERENCES & SYSTEM',
+                'OPERATIONS TERMINAL',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 11.5,
@@ -160,34 +162,22 @@ class AccountPlaceholderScreen extends StatelessWidget {
               AppCard(
                 child: Column(
                   children: [
-                    _buildSettingsItem(
-                      icon: Icons.notifications_none_rounded,
-                      title: 'Notifications',
-                      trailingText: 'Configured in Phase 2',
+                    _buildStatusItem(
+                      icon: Icons.sync_rounded,
+                      title: 'Shared State Sync',
+                      statusText: 'Connected (Phase 7)',
                     ),
                     const Divider(height: 18),
-                    _buildSettingsItem(
-                      icon: Icons.qr_code_rounded,
-                      title: 'QR Access Pass Architecture',
-                      trailingText: 'Ready',
+                    _buildStatusItem(
+                      icon: Icons.checklist_rounded,
+                      title: 'Request Intake Engine',
+                      statusText: 'All 6 Domains Active',
                     ),
                     const Divider(height: 18),
-                    _buildSettingsItem(
-                      icon: Icons.shield_outlined,
-                      title: AppStrings.switchSecurityPortal,
-                      trailingText: 'Gate View',
-                      onTap: () {
-                        Navigator.of(context).pushNamed(
-                          AppRouter.security,
-                          arguments: selectedEstate,
-                        );
-                      },
-                    ),
-                    const Divider(height: 18),
-                    _buildSettingsItem(
-                      icon: Icons.info_outline_rounded,
-                      title: 'Version',
-                      trailingText: '1.0.0 (Phase 1 Foundation)',
+                    _buildStatusItem(
+                      icon: Icons.terminal_rounded,
+                      title: 'Terminal Build',
+                      statusText: '1.0.0-mgmt',
                     ),
                   ],
                 ),
@@ -195,13 +185,13 @@ class AccountPlaceholderScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // Prototype Portal Switcher
+              // ── Prototype Role Switcher ───────────────────────────────────
               PrototypeRoleSwitcher(
-                currentRole: PrototypeRole.resident,
+                currentRole: PrototypeRole.management,
                 estate: selectedEstate,
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -209,44 +199,34 @@ class AccountPlaceholderScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsItem({
+  Widget _buildStatusItem({
     required IconData icon,
     required String title,
-    required String trailingText,
-    VoidCallback? onTap,
+    required String statusText,
   }) {
-    return InkWell(
-      onTap: onTap,
-      splashColor: Colors.transparent,
-      highlightColor: Colors.transparent,
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: AppColors.black),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            trailingText,
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.black),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
             style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
+              color: AppColors.textPrimary,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          if (onTap != null) ...[
-            const SizedBox(width: 4),
-            const Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppColors.gray400),
-          ],
-        ],
-      ),
+        ),
+        Text(
+          statusText,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ],
     );
   }
 }

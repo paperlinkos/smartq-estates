@@ -425,5 +425,49 @@ class AppStrings {
   static const String filterAll = 'ALL';
   static const String actionAdvanceStatus = 'ADVANCE STATUS';
   static const String statusUpdatedNotice = 'Status updated successfully.';
+
+  // Phase 7 Management Experience & Prototype Role Switcher
+  static const String tabManagement = 'MANAGEMENT';
+  static const String tabManagementRequests = 'REQUESTS';
+  static const String tabManagementAccount = 'ACCOUNT';
+  static const String managementDashboardTitle = 'MANAGEMENT';
+  static const String managementDashboardSubtitle =
+      'ESTATE OPERATIONS & REQUESTS.';
+  static const String managementRequestsTitle = 'REQUESTS';
+  static const String managementRequestsSubtitle =
+      'LIVE RESIDENT SERVICE QUEUE.';
+  static const String managementRequestDetailTitle = 'MANAGE REQUEST';
+  static const String managementRequestDetailSubtitle =
+      'OPERATIONAL DETAILS & ACTIONS.';
+  static const String managementAccountTitle = 'OPERATIONS';
+  static const String managementAccountSubtitle =
+      'ESTATE MANAGEMENT PROFILE.';
+  static const String filterNew = 'NEW';
+  static const String filterInProgress = 'IN PROGRESS';
+  static const String filterCompleted = 'COMPLETED';
+  static const String actionAcceptAndStart = 'ACCEPT / START';
+  static const String actionMarkCompleted = 'MARK COMPLETED';
+  static const String statusCompletedNotice =
+      'COMPLETED — NO FURTHER ACTION';
+  static const String requesterInfoTitle = 'REQUESTER INFORMATION';
+  static const String labelRequesterName = 'RESIDENT';
+  static const String labelUnitEstate = 'UNIT / ESTATE';
+  static const String labelSubmittedAt = 'SUBMITTED AT';
+  static const String labelRequestStatus = 'CURRENT STATUS';
+  static const String totalRequests = 'TOTAL REQUESTS';
+  static const String pendingRequests = 'NEW / REQUESTED';
+  static const String inProgressRequests = 'IN PROGRESS';
+  static const String completedRequests = 'COMPLETED';
+  static const String liveOperationsQueue = 'LIVE OPERATIONS QUEUE';
+  static const String noManagementRequests = 'NO REQUESTS FOUND';
+  static const String noManagementRequestsSubtitle =
+      'New resident service requests will appear in this queue.';
+  static const String prototypeRoleSwitcherTitle = 'PROTOTYPE PORTAL SWITCHER';
+  static const String prototypeRoleSwitcherSubtitle =
+      'Switch views to demonstrate on one device.';
+  static const String roleResident = 'RESIDENT';
+  static const String roleManagement = 'MANAGEMENT';
+  static const String roleSecurity = 'SECURITY';
+  static const String switchRoleButton = 'SWITCH VIEW';
 }
 

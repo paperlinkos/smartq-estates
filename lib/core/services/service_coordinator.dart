@@ -118,6 +118,81 @@ class ServiceCoordinator {
     return false;
   }
 
+  /// Returns requests filtered for a specific resident (e.g., for RLS simulation).
+  List<ServiceRequestItem> getRequestsForResident(String residentId) {
+    return List.unmodifiable(
+      getAllRequests().where((r) => r.residentId == residentId),
+    );
+  }
+
+  /// Management action: transitions a request directly from intake `requested` to active `inProgress`.
+  bool startRequest(String id) {
+    final item = getRequestById(id);
+    if (item == null || item.operationalPhase != ServiceOperationalPhase.requested) {
+      return false;
+    }
+
+    if (id.startsWith('MR-')) {
+      marketRunRepo.updateStatus(id, MarketRunStatus.shopping);
+      return true;
+    }
+    if (id.startsWith('GR-')) {
+      groceryRepo.updateStatus(id, GroceryRequestStatus.shopping);
+      return true;
+    }
+    if (id.startsWith('GAS-')) {
+      gasRepo.updateStatus(id, GasRequestStatus.refilling);
+      return true;
+    }
+    if (id.startsWith('PETROL-')) {
+      petrolRepo.updateStatus(id, PetrolRequestStatus.refuelling);
+      return true;
+    }
+    if (id.startsWith('GEN-')) {
+      generatorRepo.updateStatus(id, GeneratorRequestStatus.inProgress);
+      return true;
+    }
+    if (id.startsWith('MAINT-')) {
+      maintenanceRepo.updateStatus(id, MaintenanceRequestStatus.inProgress);
+      return true;
+    }
+    return false;
+  }
+
+  /// Management action: transitions an active request to final `completed` (or `delivered`).
+  bool completeRequest(String id) {
+    final item = getRequestById(id);
+    if (item == null || !item.isActive) {
+      return false;
+    }
+
+    if (id.startsWith('MR-')) {
+      marketRunRepo.updateStatus(id, MarketRunStatus.delivered);
+      return true;
+    }
+    if (id.startsWith('GR-')) {
+      groceryRepo.updateStatus(id, GroceryRequestStatus.delivered);
+      return true;
+    }
+    if (id.startsWith('GAS-')) {
+      gasRepo.updateStatus(id, GasRequestStatus.delivered);
+      return true;
+    }
+    if (id.startsWith('PETROL-')) {
+      petrolRepo.updateStatus(id, PetrolRequestStatus.delivered);
+      return true;
+    }
+    if (id.startsWith('GEN-')) {
+      generatorRepo.updateStatus(id, GeneratorRequestStatus.completed);
+      return true;
+    }
+    if (id.startsWith('MAINT-')) {
+      maintenanceRepo.updateStatus(id, MaintenanceRequestStatus.completed);
+      return true;
+    }
+    return false;
+  }
+
   /// Operations transition: advances request from `requested` -> operational phase -> `completed`/`delivered`.
   bool advanceStatus(String id) {
     if (id.startsWith('MR-')) {

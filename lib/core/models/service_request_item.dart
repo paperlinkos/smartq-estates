@@ -60,4 +60,13 @@ abstract class ServiceRequestItem {
 
   /// When the request was submitted.
   DateTime get createdAt;
+
+  /// Identifier of the requesting resident.
+  String get residentId;
+
+  /// Display name of the requesting resident (e.g. 'John Doe').
+  String get residentName;
+
+  /// Resident's unit or estate address (e.g. 'Unit 4B • Pinecrest Royal Estate').
+  String get unitOrEstate;
 }

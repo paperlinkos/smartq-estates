@@ -208,4 +208,13 @@ class PetrolRequest implements ServiceRequestItem {
 
   @override
   bool get canBeCancelled => status == PetrolRequestStatus.requested;
+
+  @override
+  String get residentId => 'res-01';
+
+  @override
+  String get residentName => 'John Doe';
+
+  @override
+  String get unitOrEstate => 'Unit 4B • Pinecrest Royal Estate';
 }
