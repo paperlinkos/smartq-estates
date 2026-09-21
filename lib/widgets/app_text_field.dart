@@ -15,6 +15,8 @@ class AppTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final TextCapitalization textCapitalization;
+  final int? maxLines;
+  final int? minLines;
 
   const AppTextField({
     super.key,
@@ -31,6 +33,8 @@ class AppTextField extends StatelessWidget {
     this.keyboardType,
     this.textInputAction,
     this.textCapitalization = TextCapitalization.none,
+    this.maxLines = 1,
+    this.minLines,
   });
 
   @override
@@ -60,6 +64,8 @@ class AppTextField extends StatelessWidget {
               keyboardType: keyboardType,
               textInputAction: textInputAction,
               textCapitalization: textCapitalization,
+              maxLines: maxLines,
+              minLines: minLines,
               onChanged: onChanged,
               onSubmitted: onSubmitted,
               cursorColor: AppColors.black,

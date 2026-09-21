@@ -3,6 +3,7 @@ import '../core/models/decoded_qr_payload.dart';
 import '../core/models/estate.dart';
 import '../core/models/estate_event.dart';
 import '../core/models/event_pass.dart';
+import '../core/models/market_run_request.dart';
 import '../core/models/visitor_pass.dart';
 import '../screens/estate_selection/estate_selection_screen.dart';
 import '../screens/main_shell/main_shell_screen.dart';
@@ -12,6 +13,8 @@ import '../screens/security/access_result_screen.dart';
 import '../screens/security/decoded_result_screen.dart';
 import '../screens/security/security_shell_screen.dart';
 import '../screens/security/verify_access_scanner_screen.dart';
+import '../screens/services/market_run_screen.dart';
+import '../screens/services/market_run_requested_screen.dart';
 import '../screens/services/services_home_screen.dart';
 import '../screens/services/service_placeholder_screens.dart' as services_placeholders;
 import '../screens/splash/splash_screen.dart';
@@ -37,8 +40,9 @@ class AppRouter {
   static const String maintenance = '/maintenance';
   static const String payments = '/payments';
 
-  // Services category routes (Phase 6A)
+  // Services category routes (Phase 6A & 6B)
   static const String marketRun = '/services/market-run';
+  static const String marketRunRequested = '/services/market-run/requested';
   static const String groceries = '/services/groceries';
   static const String gas = '/services/gas';
   static const String petrol = '/services/petrol';
@@ -124,8 +128,13 @@ class AppRouter {
         );
       case marketRun:
         return MaterialPageRoute(
-          builder: (_) =>
-              const services_placeholders.MarketRunPlaceholderScreen(),
+          builder: (_) => const MarketRunScreen(),
+          settings: settings,
+        );
+      case marketRunRequested:
+        final request = settings.arguments as MarketRunRequest;
+        return MaterialPageRoute(
+          builder: (_) => MarketRunRequestedScreen(request: request),
           settings: settings,
         );
       case groceries:

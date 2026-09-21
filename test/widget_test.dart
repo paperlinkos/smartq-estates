@@ -45,6 +45,11 @@ import 'package:smartq_estates/core/repositories/access_log_repository.dart';
 import 'package:smartq_estates/screens/services/services_home_screen.dart';
 import 'package:smartq_estates/screens/services/service_placeholder_screens.dart'
     as services_placeholders;
+// Phase 6B imports
+import 'package:smartq_estates/core/models/market_run_request.dart';
+import 'package:smartq_estates/core/repositories/market_run_repository.dart';
+import 'package:smartq_estates/screens/services/market_run_screen.dart';
+import 'package:smartq_estates/screens/services/market_run_requested_screen.dart';
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -2112,8 +2117,21 @@ void main() {
         expect(find.byType(ServicesHomeScreen), findsOneWidget);
       }
 
-      await testCardNavigation(AppStrings.marketRunTitle,
-          services_placeholders.MarketRunPlaceholderScreen);
+      // Market Run navigates to MarketRunScreen (Phase 6B)
+      await tester.ensureVisible(find.text(AppStrings.marketRunTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.marketRunTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(MarketRunScreen), findsOneWidget);
+      final marketRunBackButton = find.descendant(
+        of: find.byType(MarketRunScreen),
+        matching: find.byIcon(Icons.arrow_back),
+      );
+      await tester.tap(marketRunBackButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Remaining 5 services navigate to placeholder screens
       await testCardNavigation(AppStrings.groceriesTitle,
           services_placeholders.GroceriesPlaceholderScreen);
       await testCardNavigation(
@@ -2156,6 +2174,408 @@ void main() {
     });
   });
 
+  group('SmartQ Estates - Phase 6B MarketRunRequest Model Tests', () {
+    test('MarketRunRequest.create initializes defaults and fields', () {
+      final req = MarketRunRequest.create(
+        items: 'Tomatoes, Onions, Peppers, Rice',
+        timing: MarketRunTiming.asSoonAsPossible,
+      );
+
+      expect(req.id.startsWith('MR-'), isTrue);
+      expect(req.items, 'Tomatoes, Onions, Peppers, Rice');
+      expect(req.timing, MarketRunTiming.asSoonAsPossible);
+      expect(req.scheduledFor, isNull);
+      expect(req.deliveryLocation, 'estateAddress');
+      expect(req.notes, isNull);
+      expect(req.status, MarketRunStatus.requested);
+      expect(req.createdAt, isNotNull);
+    });
+
+    test('MarketRunRequest supports scheduled timing and optional notes', () {
+      final scheduledTime = DateTime.now().add(const Duration(days: 1));
+      final req = MarketRunRequest.create(
+        items: '2 cartons of bottled water',
+        timing: MarketRunTiming.scheduled,
+        scheduledFor: scheduledTime,
+        notes: 'Call before arriving',
+      );
+
+      expect(req.items, '2 cartons of bottled water');
+      expect(req.timing, MarketRunTiming.scheduled);
+      expect(req.scheduledFor, scheduledTime);
+      expect(req.notes, 'Call before arriving');
+      expect(req.status, MarketRunStatus.requested);
+    });
+
+    test('MarketRunTiming enum has expected values', () {
+      expect(MarketRunTiming.values, containsAll([
+        MarketRunTiming.asSoonAsPossible,
+        MarketRunTiming.laterToday,
+        MarketRunTiming.scheduled,
+      ]));
+    });
+
+    test('MarketRunStatus enum has expected values', () {
+      expect(MarketRunStatus.values, containsAll([
+        MarketRunStatus.requested,
+        MarketRunStatus.assigned,
+        MarketRunStatus.shopping,
+        MarketRunStatus.outForDelivery,
+        MarketRunStatus.delivered,
+        MarketRunStatus.cancelled,
+      ]));
+    });
+  });
+
+  group('SmartQ Estates - Phase 6B MarketRunRepository Tests', () {
+    late LocalMarketRunRepository repo;
+
+    setUp(() {
+      repo = LocalMarketRunRepository.testInstance();
+    });
+
+    test('createRequest stores and returns request', () {
+      final req = MarketRunRequest.create(
+        items: 'Bread and Eggs',
+        timing: MarketRunTiming.asSoonAsPossible,
+      );
+
+      final created = repo.createRequest(req);
+      expect(created.id, req.id);
+      expect(repo.getRequests().length, 1);
+      expect(repo.getRequests().first.id, req.id);
+    });
+
+    test('getRequests returns requests sorted by createdAt descending', () {
+      final first = MarketRunRequest.create(
+        items: 'First Item',
+        timing: MarketRunTiming.laterToday,
+        createdAt: DateTime(2026, 1, 1, 10, 0),
+      );
+      final second = MarketRunRequest.create(
+        items: 'Second Item',
+        timing: MarketRunTiming.asSoonAsPossible,
+        createdAt: DateTime(2026, 1, 1, 11, 0),
+      );
+
+      repo.createRequest(first);
+      repo.createRequest(second);
+
+      final list = repo.getRequests();
+      expect(list.length, 2);
+      expect(list[0].id, second.id);
+      expect(list[1].id, first.id);
+    });
+
+    test('getRequestById returns matching request or null', () {
+      final req = MarketRunRequest.create(
+        items: 'Yams and Palm Oil',
+        timing: MarketRunTiming.asSoonAsPossible,
+      );
+      repo.createRequest(req);
+
+      expect(repo.getRequestById(req.id)?.items, 'Yams and Palm Oil');
+      expect(repo.getRequestById('NON-EXISTENT'), isNull);
+    });
+
+    test('clear removes all requests', () {
+      repo.createRequest(MarketRunRequest.create(
+        items: 'Sugar and Milk',
+        timing: MarketRunTiming.laterToday,
+      ));
+      expect(repo.getRequests().length, 1);
+
+      repo.clear();
+      expect(repo.getRequests(), isEmpty);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6B MarketRunScreen Widget Tests', () {
+    late LocalMarketRunRepository testRepo;
+
+    setUp(() {
+      testRepo = LocalMarketRunRepository.testInstance();
+    });
+
+    testWidgets('MarketRunScreen renders header, subtitle, question, and inputs',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunScreen(repository: testRepo),
+        ),
+      );
+
+      // Header & Subtitle
+      expect(find.text(AppStrings.marketRunTitle), findsOneWidget);
+      expect(find.text(AppStrings.marketRunHeaderSubtitle), findsOneWidget);
+
+      // Question section
+      expect(find.text(AppStrings.marketRunQuestion), findsOneWidget);
+      expect(find.text(AppStrings.marketRunQuestionSubtitle), findsOneWidget);
+
+      // Multiline items input
+      expect(find.text(AppStrings.labelItems), findsOneWidget);
+      expect(find.text(AppStrings.hintMarketRunItems), findsOneWidget);
+
+      // Timing options
+      expect(find.text(AppStrings.timingHeading), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+      expect(find.text(AppStrings.timingSchedule), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes (optional)
+      expect(find.text(AppStrings.labelNotesOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintMarketRunNotes), findsOneWidget);
+
+      // Submit button
+      expect(find.text(AppStrings.actionRequestMarketRun), findsOneWidget);
+    });
+
+    testWidgets('Submitting with empty items displays error message',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunScreen(repository: testRepo),
+        ),
+      );
+
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorItemsRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Can select timing options: ASAP, LATER TODAY, SCHEDULE',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunScreen(repository: testRepo),
+        ),
+      );
+
+      // Default is ASAP
+      // Select LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+
+      // Schedule pickers should not be shown yet
+      expect(find.text('Select Date'), findsNothing);
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Schedule pickers should now appear
+      expect(find.text('Select Date'), findsOneWidget);
+      expect(find.text('Select Time'), findsOneWidget);
+    });
+
+    testWidgets('SCHEDULE without choosing date/time displays error when submitting',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunScreen(repository: testRepo),
+        ),
+      );
+
+      // Enter valid items
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMarketRunItems),
+        'Bag of Rice, 5L Groundnut Oil',
+      );
+      await tester.pumpAndSettle();
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Tap submit without setting date/time
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorScheduledRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Valid submission saves request to repo and navigates to requested screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Enter items
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMarketRunItems),
+        'Tomatoes, Onions, Fresh Pepper, Chicken',
+      );
+      await tester.pumpAndSettle();
+
+      // Enter optional notes
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintMarketRunNotes));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMarketRunNotes),
+        'Please get hard chicken if available.',
+      );
+      await tester.pumpAndSettle();
+
+      // Tap submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+
+      // Verify request in repository
+      final requests = testRepo.getRequests();
+      expect(requests.length, 1);
+      expect(requests.first.items, 'Tomatoes, Onions, Fresh Pepper, Chicken');
+      expect(requests.first.notes, 'Please get hard chicken if available.');
+      expect(requests.first.timing, MarketRunTiming.asSoonAsPossible);
+      expect(requests.first.status, MarketRunStatus.requested);
+
+      // Verify transition to MarketRunRequestedScreen
+      expect(find.byType(MarketRunRequestedScreen), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedSubtitle), findsOneWidget);
+      expect(find.text('Tomatoes, Onions, Fresh Pepper, Chicken'), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+      expect(find.text('Please get hard chicken if available.'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6B MarketRunRequestedScreen Tests', () {
+    testWidgets('Displays all request details and notes when provided',
+        (WidgetTester tester) async {
+      final request = MarketRunRequest.create(
+        items: 'Fresh bread, Butter, Milk, Plantains',
+        timing: MarketRunTiming.laterToday,
+        notes: 'Deliver to Block B gate.',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunRequestedScreen(request: request),
+        ),
+      );
+
+      // Header & subtitle
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedSubtitle), findsOneWidget);
+
+      // What you asked for
+      expect(find.text(AppStrings.labelWhatYouAskedFor), findsOneWidget);
+      expect(find.text('Fresh bread, Butter, Milk, Plantains'), findsOneWidget);
+
+      // When
+      expect(find.text(AppStrings.labelWhen), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes
+      expect(find.text(AppStrings.labelNotes), findsOneWidget);
+      expect(find.text('Deliver to Block B gate.'), findsOneWidget);
+
+      // Done button
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('Does not display notes section when notes are null or empty',
+        (WidgetTester tester) async {
+      final request = MarketRunRequest.create(
+        items: 'Bottled water',
+        timing: MarketRunTiming.asSoonAsPossible,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MarketRunRequestedScreen(request: request),
+        ),
+      );
+
+      expect(find.text(AppStrings.labelWhatYouAskedFor), findsOneWidget);
+      expect(find.text(AppStrings.labelNotes), findsNothing);
+    });
+
+    testWidgets('DONE button returns to Services Home',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouter.services),
+                child: const Text('GO TO SERVICES'),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Open ServicesHomeScreen with named route
+      await tester.tap(find.text('GO TO SERVICES'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Navigate to MarketRunScreen
+      await tester.ensureVisible(find.text(AppStrings.marketRunTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.marketRunTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MarketRunScreen), findsOneWidget);
+
+      // Enter items
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMarketRunItems),
+        'Bottled water',
+      );
+      await tester.pumpAndSettle();
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMarketRun));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MarketRunRequestedScreen), findsOneWidget);
+
+      // Tap DONE
+      await tester.ensureVisible(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+
+      // Returns to ServicesHomeScreen
+      expect(find.byType(MarketRunRequestedScreen), findsNothing);
+      expect(find.byType(MarketRunScreen), findsNothing);
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+    });
+  });
 }
 
 

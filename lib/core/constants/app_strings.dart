@@ -267,5 +267,35 @@ class AppStrings {
 
   static const String servicePlaceholderNotice =
       'This service will be built in the next step.';
+
+  // Phase 6B — Market Run Request
+  static const String marketRunHeaderSubtitle = 'SOMEONE SHOPS FOR YOU.';
+  static const String marketRunQuestion = 'WHAT DO YOU NEED?';
+  static const String marketRunQuestionSubtitle =
+      'List the things you want someone to buy for you.';
+  static const String labelItems = 'ITEMS';
+  static const String hintMarketRunItems =
+      'e.g. Tomatoes, onions, chicken, rice and bottled water.';
+  static const String timingHeading = 'WHEN DO YOU NEED IT?';
+  static const String timingAsap = 'AS SOON AS POSSIBLE';
+  static const String timingLaterToday = 'LATER TODAY';
+  static const String timingSchedule = 'SCHEDULE';
+  static const String labelDeliverTo = 'DELIVER TO';
+  static const String myEstateAddress = 'MY ESTATE ADDRESS';
+  static const String labelNotesOptional = 'NOTES (OPTIONAL)';
+  static const String hintMarketRunNotes =
+      'Anything else the shopper should know.';
+  static const String actionRequestMarketRun = 'REQUEST MARKET RUN';
+  static const String errorItemsRequired = 'Please tell us what you need.';
+  static const String errorScheduledPast =
+      'Scheduled time cannot be in the past.';
+  static const String errorScheduledRequired =
+      'Please select a date and time.';
+  static const String requestReceivedTitle = 'REQUEST RECEIVED';
+  static const String requestReceivedSubtitle =
+      "We've received your market run request.";
+  static const String labelWhatYouAskedFor = 'WHAT YOU ASKED FOR';
+  static const String labelWhen = 'WHEN';
+  static const String labelNotes = 'NOTES';
 }
 
