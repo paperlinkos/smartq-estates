@@ -41,6 +41,10 @@ import 'package:smartq_estates/screens/security/access_result_screen.dart';
 // Phase 5D imports
 import 'package:smartq_estates/core/models/access_record.dart';
 import 'package:smartq_estates/core/repositories/access_log_repository.dart';
+// Phase 6A imports
+import 'package:smartq_estates/screens/services/services_home_screen.dart';
+import 'package:smartq_estates/screens/services/service_placeholder_screens.dart'
+    as services_placeholders;
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -2024,7 +2028,136 @@ void main() {
     });
   });
 
+  group('SmartQ Estates - Phase 6A Resident Services Home Tests', () {
+    testWidgets('ServicesHomeScreen renders header, subtitle, and primary question',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ServicesHomeScreen(),
+        ),
+      );
+
+      // Header & Subtitle
+      expect(find.text(AppStrings.servicesTitle), findsOneWidget);
+      expect(find.text(AppStrings.servicesSubtitle), findsOneWidget);
+
+      // Primary Question
+      expect(find.text(AppStrings.servicesQuestion), findsOneWidget);
+      expect(find.text(AppStrings.servicesQuestionSubtitle), findsOneWidget);
+    });
+
+    testWidgets('All six service cards render with correct titles and subtitles',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: ServicesHomeScreen(),
+        ),
+      );
+
+      // 1. MARKET RUN
+      expect(find.text(AppStrings.marketRunTitle), findsOneWidget);
+      expect(find.text(AppStrings.marketRunSubtitle), findsOneWidget);
+
+      // 2. GROCERIES
+      expect(find.text(AppStrings.groceriesTitle), findsOneWidget);
+      expect(find.text(AppStrings.groceriesSubtitle), findsOneWidget);
+
+      // 3. GAS
+      expect(find.text(AppStrings.gasTitle), findsOneWidget);
+      expect(find.text(AppStrings.gasSubtitle), findsOneWidget);
+
+      // 4. PETROL
+      expect(find.text(AppStrings.petrolTitle), findsOneWidget);
+      expect(find.text(AppStrings.petrolSubtitle), findsOneWidget);
+
+      // 5. GENERATOR
+      expect(find.text(AppStrings.generatorTitle), findsOneWidget);
+      expect(find.text(AppStrings.generatorSubtitle), findsOneWidget);
+
+      // 6. MAINTENANCE
+      expect(find.text(AppStrings.maintenanceTitle), findsOneWidget);
+      expect(find.text(AppStrings.maintenanceSubtitle), findsOneWidget);
+    });
+
+    testWidgets('Tapping each service card navigates to its corresponding placeholder screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: const ServicesHomeScreen(),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Helper to test each service card navigation
+      Future<void> testCardNavigation(
+        String cardTitle,
+        Type expectedScreenType,
+      ) async {
+        await tester.ensureVisible(find.text(cardTitle));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(cardTitle));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(expectedScreenType), findsOneWidget);
+        expect(find.text(cardTitle), findsWidgets);
+        expect(find.text(AppStrings.servicePlaceholderNotice), findsOneWidget);
+
+        // Pop back using the AppHeader back button of the top screen
+        final backButton = find.descendant(
+          of: find.byType(expectedScreenType),
+          matching: find.byIcon(Icons.arrow_back),
+        );
+        await tester.tap(backButton);
+        await tester.pumpAndSettle();
+        expect(find.byType(ServicesHomeScreen), findsOneWidget);
+      }
+
+      await testCardNavigation(AppStrings.marketRunTitle,
+          services_placeholders.MarketRunPlaceholderScreen);
+      await testCardNavigation(AppStrings.groceriesTitle,
+          services_placeholders.GroceriesPlaceholderScreen);
+      await testCardNavigation(
+          AppStrings.gasTitle, services_placeholders.GasPlaceholderScreen);
+      await testCardNavigation(AppStrings.petrolTitle,
+          services_placeholders.PetrolPlaceholderScreen);
+      await testCardNavigation(AppStrings.generatorTitle,
+          services_placeholders.GeneratorPlaceholderScreen);
+      await testCardNavigation(AppStrings.maintenanceTitle,
+          services_placeholders.MaintenancePlaceholderScreen);
+    });
+
+    testWidgets('Back navigation from ServicesHomeScreen returns to previous screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ServicesHomeScreen()),
+                ),
+                child: const Text('RESIDENT HOME'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('RESIDENT HOME'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Tap back in header
+      await tester.tap(find.byIcon(Icons.arrow_back));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ServicesHomeScreen), findsNothing);
+      expect(find.text('RESIDENT HOME'), findsOneWidget);
+    });
+  });
+
 }
+
 
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────

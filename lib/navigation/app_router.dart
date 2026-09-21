@@ -12,7 +12,8 @@ import '../screens/security/access_result_screen.dart';
 import '../screens/security/decoded_result_screen.dart';
 import '../screens/security/security_shell_screen.dart';
 import '../screens/security/verify_access_scanner_screen.dart';
-import '../screens/services/services_placeholder_screen.dart';
+import '../screens/services/services_home_screen.dart';
+import '../screens/services/service_placeholder_screens.dart' as services_placeholders;
 import '../screens/splash/splash_screen.dart';
 import '../screens/visitors/create_event_screen.dart';
 import '../screens/visitors/event_created_screen.dart';
@@ -35,6 +36,14 @@ class AppRouter {
   static const String services = '/services';
   static const String maintenance = '/maintenance';
   static const String payments = '/payments';
+
+  // Services category routes (Phase 6A)
+  static const String marketRun = '/services/market-run';
+  static const String groceries = '/services/groceries';
+  static const String gas = '/services/gas';
+  static const String petrol = '/services/petrol';
+  static const String generator = '/services/generator';
+  static const String serviceMaintenance = '/services/maintenance';
 
   // Visitors action routes
   static const String inviteSomeone = '/visitors/invite';
@@ -110,7 +119,42 @@ class AppRouter {
         );
       case services:
         return MaterialPageRoute(
-          builder: (_) => const ServicesPlaceholderScreen(),
+          builder: (_) => const ServicesHomeScreen(),
+          settings: settings,
+        );
+      case marketRun:
+        return MaterialPageRoute(
+          builder: (_) =>
+              const services_placeholders.MarketRunPlaceholderScreen(),
+          settings: settings,
+        );
+      case groceries:
+        return MaterialPageRoute(
+          builder: (_) =>
+              const services_placeholders.GroceriesPlaceholderScreen(),
+          settings: settings,
+        );
+      case gas:
+        return MaterialPageRoute(
+          builder: (_) => const services_placeholders.GasPlaceholderScreen(),
+          settings: settings,
+        );
+      case petrol:
+        return MaterialPageRoute(
+          builder: (_) =>
+              const services_placeholders.PetrolPlaceholderScreen(),
+          settings: settings,
+        );
+      case generator:
+        return MaterialPageRoute(
+          builder: (_) =>
+              const services_placeholders.GeneratorPlaceholderScreen(),
+          settings: settings,
+        );
+      case serviceMaintenance:
+        return MaterialPageRoute(
+          builder: (_) =>
+              const services_placeholders.MaintenancePlaceholderScreen(),
           settings: settings,
         );
       case maintenance:

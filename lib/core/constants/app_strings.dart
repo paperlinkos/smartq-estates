@@ -239,5 +239,33 @@ class AppStrings {
   static const String labelEventAccess = 'EVENT ACCESS';
   static const String checkedInSuffix = 'CHECKED IN';
   static const String accessEventsSuffix = 'ACCESS EVENTS';
+
+  // Phase 6A — Resident Services Home
+  static const String servicesTitle = 'SERVICES';
+  static const String servicesSubtitle = 'GET THINGS DONE.';
+  static const String servicesQuestion = 'WHAT DO YOU NEED?';
+  static const String servicesQuestionSubtitle =
+      "Choose a service and we'll take you through the next step.";
+
+  static const String marketRunTitle = 'MARKET RUN';
+  static const String marketRunSubtitle = 'Someone shops for you.';
+
+  static const String groceriesTitle = 'GROCERIES';
+  static const String groceriesSubtitle = 'Get everyday essentials delivered.';
+
+  static const String gasTitle = 'GAS';
+  static const String gasSubtitle = 'Request cooking gas delivery.';
+
+  static const String petrolTitle = 'PETROL';
+  static const String petrolSubtitle = 'Request fuel delivery.';
+
+  static const String generatorTitle = 'GENERATOR';
+  static const String generatorSubtitle = 'Get generator service.';
+
+  static const String maintenanceTitle = 'MAINTENANCE';
+  static const String maintenanceSubtitle = 'Get something fixed.';
+
+  static const String servicePlaceholderNotice =
+      'This service will be built in the next step.';
 }
 
