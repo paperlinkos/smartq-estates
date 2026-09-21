@@ -311,5 +311,23 @@ class AppStrings {
   static const String actionRequestGroceries = 'REQUEST GROCERIES';
   static const String groceriesRequestReceivedSubtitle =
       "We've received your groceries request.";
+
+  // Phase 6D — Gas Request
+  static const String gasHeaderSubtitle = 'REQUEST COOKING GAS DELIVERY.';
+  static const String gasQuestion = 'SELECT CYLINDER SIZE';
+  static const String gasQuestionSubtitle =
+      'Choose your cylinder size or enter a custom quantity.';
+  static const String labelCylinderSize = 'CYLINDER SIZE';
+  static const String labelCustomQuantity = 'CUSTOM QUANTITY';
+  static const String hintCustomGasQuantity =
+      'e.g. 2 x 12.5 KG, 25 KG or 50 KG';
+  static const String hintGasNotes =
+      'Anything else the delivery person should know.';
+  static const String actionRequestGas = 'REQUEST GAS';
+  static const String gasRequestReceivedSubtitle =
+      "We've received your cooking gas request.";
+  static const String errorGasQuantityRequired =
+      'Please select or enter a cylinder quantity.';
+  static const String labelQuantityRequested = 'QUANTITY';
 }
 

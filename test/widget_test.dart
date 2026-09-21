@@ -55,6 +55,11 @@ import 'package:smartq_estates/core/models/grocery_request.dart';
 import 'package:smartq_estates/core/repositories/grocery_repository.dart';
 import 'package:smartq_estates/screens/services/groceries_screen.dart';
 import 'package:smartq_estates/screens/services/groceries_requested_screen.dart';
+// Phase 6D imports
+import 'package:smartq_estates/core/models/gas_request.dart';
+import 'package:smartq_estates/core/repositories/gas_repository.dart';
+import 'package:smartq_estates/screens/services/gas_screen.dart';
+import 'package:smartq_estates/screens/services/gas_requested_screen.dart';
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -2150,9 +2155,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
 
-      // Remaining 4 services navigate to placeholder screens
-      await testCardNavigation(
-          AppStrings.gasTitle, services_placeholders.GasPlaceholderScreen);
+      // Gas navigates to GasScreen (Phase 6D)
+      await tester.ensureVisible(find.text(AppStrings.gasTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.gasTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(GasScreen), findsOneWidget);
+      final gasBackButton = find.descendant(
+        of: find.byType(GasScreen),
+        matching: find.byIcon(Icons.arrow_back),
+      );
+      await tester.tap(gasBackButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Remaining 3 services navigate to placeholder screens
       await testCardNavigation(AppStrings.petrolTitle,
           services_placeholders.PetrolPlaceholderScreen);
       await testCardNavigation(AppStrings.generatorTitle,
@@ -2993,6 +3010,422 @@ void main() {
       // Returns to ServicesHomeScreen
       expect(find.byType(GroceriesRequestedScreen), findsNothing);
       expect(find.byType(GroceriesScreen), findsNothing);
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6D GasRequest Model Tests', () {
+    test('GasRequest.create initializes defaults and fields', () {
+      final req = GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+      );
+
+      expect(req.id.startsWith('GAS-'), isTrue);
+      expect(req.cylinderSize, '12.5 KG');
+      expect(req.isCustom, isFalse);
+      expect(req.timing, GasTiming.asSoonAsPossible);
+      expect(req.scheduledFor, isNull);
+      expect(req.deliveryLocation, 'estateAddress');
+      expect(req.notes, isNull);
+      expect(req.status, GasRequestStatus.requested);
+      expect(req.createdAt, isNotNull);
+    });
+
+    test('GasRequest supports custom cylinder size, scheduled timing and optional notes', () {
+      final scheduledTime = DateTime.now().add(const Duration(days: 1));
+      final req = GasRequest.create(
+        cylinderSize: '2 x 12.5 KG',
+        isCustom: true,
+        timing: GasTiming.scheduled,
+        scheduledFor: scheduledTime,
+        notes: 'Handle cylinders carefully',
+      );
+
+      expect(req.cylinderSize, '2 x 12.5 KG');
+      expect(req.isCustom, isTrue);
+      expect(req.timing, GasTiming.scheduled);
+      expect(req.scheduledFor, scheduledTime);
+      expect(req.notes, 'Handle cylinders carefully');
+      expect(req.status, GasRequestStatus.requested);
+    });
+
+    test('GasTiming enum has expected values', () {
+      expect(GasTiming.values, containsAll([
+        GasTiming.asSoonAsPossible,
+        GasTiming.laterToday,
+        GasTiming.scheduled,
+      ]));
+    });
+
+    test('GasRequestStatus enum has expected values', () {
+      expect(GasRequestStatus.values, containsAll([
+        GasRequestStatus.requested,
+        GasRequestStatus.assigned,
+        GasRequestStatus.refilling,
+        GasRequestStatus.outForDelivery,
+        GasRequestStatus.delivered,
+        GasRequestStatus.cancelled,
+      ]));
+    });
+  });
+
+  group('SmartQ Estates - Phase 6D GasRepository Tests', () {
+    late LocalGasRepository repo;
+
+    setUp(() {
+      repo = LocalGasRepository.testInstance();
+    });
+
+    test('createRequest stores and returns request', () {
+      final req = GasRequest.create(
+        cylinderSize: '6 KG',
+        timing: GasTiming.asSoonAsPossible,
+      );
+
+      final created = repo.createRequest(req);
+      expect(created.id, req.id);
+      expect(repo.getRequests().length, 1);
+      expect(repo.getRequests().first.id, req.id);
+    });
+
+    test('getRequests returns requests sorted by createdAt descending', () {
+      final first = GasRequest.create(
+        cylinderSize: '5 KG',
+        timing: GasTiming.laterToday,
+        createdAt: DateTime(2026, 1, 1, 10, 0),
+      );
+      final second = GasRequest.create(
+        cylinderSize: '12.5 KG',
+        timing: GasTiming.asSoonAsPossible,
+        createdAt: DateTime(2026, 1, 1, 11, 0),
+      );
+
+      repo.createRequest(first);
+      repo.createRequest(second);
+
+      final list = repo.getRequests();
+      expect(list.length, 2);
+      expect(list[0].id, second.id);
+      expect(list[1].id, first.id);
+    });
+
+    test('getRequestById returns matching request or null', () {
+      final req = GasRequest.create(
+        cylinderSize: '10 KG',
+        timing: GasTiming.asSoonAsPossible,
+      );
+      repo.createRequest(req);
+
+      expect(repo.getRequestById(req.id)?.cylinderSize, '10 KG');
+      expect(repo.getRequestById('NON-EXISTENT'), isNull);
+    });
+
+    test('clear removes all requests', () {
+      repo.createRequest(GasRequest.create(
+        cylinderSize: '3 KG',
+        timing: GasTiming.laterToday,
+      ));
+      expect(repo.getRequests().length, 1);
+
+      repo.clear();
+      expect(repo.getRequests(), isEmpty);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6D GasScreen Widget Tests', () {
+    late LocalGasRepository testRepo;
+
+    setUp(() {
+      testRepo = LocalGasRepository.testInstance();
+    });
+
+    testWidgets('GasScreen renders header, subtitle, question, cylinder sizes, and inputs',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasScreen(repository: testRepo),
+        ),
+      );
+
+      // Header & Subtitle
+      expect(find.text(AppStrings.gasTitle), findsOneWidget);
+      expect(find.text(AppStrings.gasHeaderSubtitle), findsOneWidget);
+
+      // Question section
+      expect(find.text(AppStrings.gasQuestion), findsOneWidget);
+      expect(find.text(AppStrings.gasQuestionSubtitle), findsOneWidget);
+
+      // Cylinder sizes
+      expect(find.text(AppStrings.labelCylinderSize), findsOneWidget);
+      expect(find.text('3 KG'), findsOneWidget);
+      expect(find.text('5 KG'), findsOneWidget);
+      expect(find.text('6 KG'), findsOneWidget);
+      expect(find.text('10 KG'), findsOneWidget);
+      expect(find.text('12.5 KG'), findsOneWidget);
+      expect(find.text('CUSTOM'), findsOneWidget);
+
+      // Timing options
+      expect(find.text(AppStrings.timingHeading), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+      expect(find.text(AppStrings.timingSchedule), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes (optional)
+      expect(find.text(AppStrings.labelNotesOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintGasNotes), findsOneWidget);
+
+      // Submit button
+      expect(find.text(AppStrings.actionRequestGas), findsOneWidget);
+    });
+
+    testWidgets('Selecting cylinder size updates selection',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasScreen(repository: testRepo),
+        ),
+      );
+
+      // Default is 12.5 KG, tap 6 KG
+      await tester.tap(find.text('6 KG'));
+      await tester.pumpAndSettle();
+
+      // Custom field should not be present
+      expect(find.text(AppStrings.labelCustomQuantity), findsNothing);
+    });
+
+    testWidgets('Selecting CUSTOM reveals custom quantity field and validates required',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasScreen(repository: testRepo),
+        ),
+      );
+
+      // Tap CUSTOM
+      await tester.ensureVisible(find.text('CUSTOM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CUSTOM'));
+      await tester.pumpAndSettle();
+
+      // Custom input field should appear
+      expect(find.text(AppStrings.labelCustomQuantity), findsOneWidget);
+      expect(find.text(AppStrings.hintCustomGasQuantity), findsOneWidget);
+
+      // Tap submit with empty custom field
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorGasQuantityRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Can select timing options: ASAP, LATER TODAY, SCHEDULE',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasScreen(repository: testRepo),
+        ),
+      );
+
+      // Select LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Select Date'), findsNothing);
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Select Date'), findsOneWidget);
+      expect(find.text('Select Time'), findsOneWidget);
+    });
+
+    testWidgets('SCHEDULE without choosing date/time displays error when submitting',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasScreen(repository: testRepo),
+        ),
+      );
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Tap submit without setting date/time
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorScheduledRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Valid submission saves request to repo and navigates to requested screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Select 12.5 KG (default)
+      // Enter optional notes
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintGasNotes));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGasNotes),
+        'Cylinder is by the back door.',
+      );
+      await tester.pumpAndSettle();
+
+      // Tap submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+
+      // Verify request in repository
+      final requests = testRepo.getRequests();
+      expect(requests.length, 1);
+      expect(requests.first.cylinderSize, '12.5 KG');
+      expect(requests.first.isCustom, isFalse);
+      expect(requests.first.notes, 'Cylinder is by the back door.');
+      expect(requests.first.timing, GasTiming.asSoonAsPossible);
+      expect(requests.first.status, GasRequestStatus.requested);
+
+      // Verify transition to GasRequestedScreen
+      expect(find.byType(GasRequestedScreen), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.gasRequestReceivedSubtitle), findsOneWidget);
+      expect(find.text('12.5 KG'), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+      expect(find.text('Cylinder is by the back door.'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6D GasRequestedScreen Tests', () {
+    testWidgets('Displays all request details and notes when provided',
+        (WidgetTester tester) async {
+      final request = GasRequest.create(
+        cylinderSize: '2 x 12.5 KG',
+        isCustom: true,
+        timing: GasTiming.laterToday,
+        notes: 'Please call security before entering.',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasRequestedScreen(request: request),
+        ),
+      );
+
+      // Header & subtitle
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.gasRequestReceivedSubtitle), findsOneWidget);
+
+      // Quantity
+      expect(find.text(AppStrings.labelQuantityRequested), findsOneWidget);
+      expect(find.text('2 x 12.5 KG'), findsOneWidget);
+
+      // When
+      expect(find.text(AppStrings.labelWhen), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes
+      expect(find.text(AppStrings.labelNotes), findsOneWidget);
+      expect(find.text('Please call security before entering.'), findsOneWidget);
+
+      // Done button
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('Does not display notes section when notes are null or empty',
+        (WidgetTester tester) async {
+      final request = GasRequest.create(
+        cylinderSize: '6 KG',
+        timing: GasTiming.asSoonAsPossible,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GasRequestedScreen(request: request),
+        ),
+      );
+
+      expect(find.text(AppStrings.labelQuantityRequested), findsOneWidget);
+      expect(find.text(AppStrings.labelNotes), findsNothing);
+    });
+
+    testWidgets('DONE button returns to Services Home',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouter.services),
+                child: const Text('GO TO SERVICES'),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Open ServicesHomeScreen with named route
+      await tester.tap(find.text('GO TO SERVICES'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Navigate to GasScreen
+      await tester.ensureVisible(find.text(AppStrings.gasTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.gasTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GasScreen), findsOneWidget);
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGas));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GasRequestedScreen), findsOneWidget);
+
+      // Tap DONE
+      await tester.ensureVisible(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+
+      // Returns to ServicesHomeScreen
+      expect(find.byType(GasRequestedScreen), findsNothing);
+      expect(find.byType(GasScreen), findsNothing);
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
   });

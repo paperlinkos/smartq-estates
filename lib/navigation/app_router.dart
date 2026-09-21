@@ -3,6 +3,7 @@ import '../core/models/decoded_qr_payload.dart';
 import '../core/models/estate.dart';
 import '../core/models/estate_event.dart';
 import '../core/models/event_pass.dart';
+import '../core/models/gas_request.dart';
 import '../core/models/grocery_request.dart';
 import '../core/models/market_run_request.dart';
 import '../core/models/visitor_pass.dart';
@@ -14,6 +15,8 @@ import '../screens/security/access_result_screen.dart';
 import '../screens/security/decoded_result_screen.dart';
 import '../screens/security/security_shell_screen.dart';
 import '../screens/security/verify_access_scanner_screen.dart';
+import '../screens/services/gas_screen.dart';
+import '../screens/services/gas_requested_screen.dart';
 import '../screens/services/groceries_screen.dart';
 import '../screens/services/groceries_requested_screen.dart';
 import '../screens/services/market_run_screen.dart';
@@ -43,12 +46,13 @@ class AppRouter {
   static const String maintenance = '/maintenance';
   static const String payments = '/payments';
 
-  // Services category routes (Phase 6A, 6B & 6C)
+  // Services category routes (Phase 6A, 6B, 6C & 6D)
   static const String marketRun = '/services/market-run';
   static const String marketRunRequested = '/services/market-run/requested';
   static const String groceries = '/services/groceries';
   static const String groceriesRequested = '/services/groceries/requested';
   static const String gas = '/services/gas';
+  static const String gasRequested = '/services/gas/requested';
   static const String petrol = '/services/petrol';
   static const String generator = '/services/generator';
   static const String serviceMaintenance = '/services/maintenance';
@@ -154,7 +158,13 @@ class AppRouter {
         );
       case gas:
         return MaterialPageRoute(
-          builder: (_) => const services_placeholders.GasPlaceholderScreen(),
+          builder: (_) => const GasScreen(),
+          settings: settings,
+        );
+      case gasRequested:
+        final request = settings.arguments as GasRequest;
+        return MaterialPageRoute(
+          builder: (_) => GasRequestedScreen(request: request),
           settings: settings,
         );
       case petrol:
