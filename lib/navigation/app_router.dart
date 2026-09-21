@@ -4,6 +4,7 @@ import '../core/models/estate.dart';
 import '../core/models/estate_event.dart';
 import '../core/models/event_pass.dart';
 import '../core/models/gas_request.dart';
+import '../core/models/generator_request.dart';
 import '../core/models/grocery_request.dart';
 import '../core/models/market_run_request.dart';
 import '../core/models/petrol_request.dart';
@@ -18,6 +19,8 @@ import '../screens/security/security_shell_screen.dart';
 import '../screens/security/verify_access_scanner_screen.dart';
 import '../screens/services/gas_screen.dart';
 import '../screens/services/gas_requested_screen.dart';
+import '../screens/services/generator_screen.dart';
+import '../screens/services/generator_requested_screen.dart';
 import '../screens/services/groceries_screen.dart';
 import '../screens/services/groceries_requested_screen.dart';
 import '../screens/services/market_run_screen.dart';
@@ -49,7 +52,7 @@ class AppRouter {
   static const String maintenance = '/maintenance';
   static const String payments = '/payments';
 
-  // Services category routes (Phase 6A, 6B, 6C, 6D & 6E)
+  // Services category routes (Phase 6A, 6B, 6C, 6D, 6E & 6F)
   static const String marketRun = '/services/market-run';
   static const String marketRunRequested = '/services/market-run/requested';
   static const String groceries = '/services/groceries';
@@ -59,6 +62,7 @@ class AppRouter {
   static const String petrol = '/services/petrol';
   static const String petrolRequested = '/services/petrol/requested';
   static const String generator = '/services/generator';
+  static const String generatorRequested = '/services/generator/requested';
   static const String serviceMaintenance = '/services/maintenance';
 
   // Visitors action routes
@@ -184,8 +188,13 @@ class AppRouter {
         );
       case generator:
         return MaterialPageRoute(
-          builder: (_) =>
-              const services_placeholders.GeneratorPlaceholderScreen(),
+          builder: (_) => const GeneratorScreen(),
+          settings: settings,
+        );
+      case generatorRequested:
+        final request = settings.arguments as GeneratorRequest;
+        return MaterialPageRoute(
+          builder: (_) => GeneratorRequestedScreen(request: request),
           settings: settings,
         );
       case serviceMaintenance:

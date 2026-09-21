@@ -349,5 +349,27 @@ class AppStrings {
   static const String errorPetrolQuantityRequired =
       'Please select or enter a fuel quantity.';
   static const String labelVehicle = 'VEHICLE';
+
+  // Phase 6F — Generator Request
+  static const String generatorHeaderSubtitle = 'REQUEST GENERATOR SERVICE.';
+  static const String generatorQuestion = 'WHAT GENERATOR SERVICE DO YOU NEED?';
+  static const String generatorQuestionSubtitle =
+      'Select a service type or describe your request.';
+  static const String labelServiceType = 'SERVICE TYPE';
+  static const String labelCustomService = 'DESCRIBE SERVICE';
+  static const String hintCustomGeneratorService =
+      'e.g. Generator smoking heavily or won’t start';
+  static const String labelGeneratorOptional = 'GENERATOR (OPTIONAL)';
+  static const String hintGenerator =
+      'e.g. 5kVA Firman or 20kVA Mikano Diesel';
+  static const String hintGeneratorNotes =
+      'Anything else the technician should know.';
+  static const String actionRequestGenerator = 'REQUEST GENERATOR SERVICE';
+  static const String generatorRequestReceivedSubtitle =
+      "We've received your generator service request.";
+  static const String errorGeneratorServiceRequired =
+      'Please select or describe the service needed.';
+  static const String labelGenerator = 'GENERATOR';
+  static const String labelServiceRequested = 'SERVICE';
 }
 

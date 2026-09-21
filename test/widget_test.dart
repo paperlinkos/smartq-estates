@@ -65,6 +65,12 @@ import 'package:smartq_estates/core/models/petrol_request.dart';
 import 'package:smartq_estates/core/repositories/petrol_repository.dart';
 import 'package:smartq_estates/screens/services/petrol_screen.dart';
 import 'package:smartq_estates/screens/services/petrol_requested_screen.dart';
+// Phase 6F imports
+import 'package:smartq_estates/core/models/generator_request.dart';
+import 'package:smartq_estates/core/repositories/generator_repository.dart';
+import 'package:smartq_estates/screens/services/generator_screen.dart';
+import 'package:smartq_estates/screens/services/generator_requested_screen.dart';
+
 
 
 void main() {
@@ -2189,9 +2195,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
 
-      // Remaining 2 services navigate to placeholder screens
-      await testCardNavigation(AppStrings.generatorTitle,
-          services_placeholders.GeneratorPlaceholderScreen);
+      // Generator navigates to GeneratorScreen (Phase 6F)
+      await tester.ensureVisible(find.text(AppStrings.generatorTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.generatorTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(GeneratorScreen), findsOneWidget);
+      final generatorBackButton = find.descendant(
+        of: find.byType(GeneratorScreen),
+        matching: find.byIcon(Icons.arrow_back),
+      );
+      await tester.tap(generatorBackButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Remaining 1 service navigates to placeholder screen
       await testCardNavigation(AppStrings.maintenanceTitle,
           services_placeholders.MaintenancePlaceholderScreen);
     });
@@ -3884,6 +3902,444 @@ void main() {
       // Returns to ServicesHomeScreen
       expect(find.byType(PetrolRequestedScreen), findsNothing);
       expect(find.byType(PetrolScreen), findsNothing);
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6F GeneratorRequest Model Tests', () {
+    test('GeneratorRequest.create initializes defaults and fields', () {
+      final req = GeneratorRequest.create(
+        serviceType: 'ROUTINE SERVICING',
+        timing: GeneratorTiming.asSoonAsPossible,
+      );
+
+      expect(req.id.startsWith('GEN-'), isTrue);
+      expect(req.serviceType, 'ROUTINE SERVICING');
+      expect(req.isCustom, isFalse);
+      expect(req.generator, isNull);
+      expect(req.timing, GeneratorTiming.asSoonAsPossible);
+      expect(req.scheduledFor, isNull);
+      expect(req.deliveryLocation, 'estateAddress');
+      expect(req.notes, isNull);
+      expect(req.status, GeneratorRequestStatus.requested);
+      expect(req.createdAt, isNotNull);
+    });
+
+    test('GeneratorRequest supports custom service, generator, scheduled timing and optional notes', () {
+      final scheduledTime = DateTime.now().add(const Duration(days: 1));
+      final req = GeneratorRequest.create(
+        serviceType: 'Generator not picking load and producing heavy smoke',
+        isCustom: true,
+        generator: '20kVA Mikano Soundproof Diesel',
+        timing: GeneratorTiming.scheduled,
+        scheduledFor: scheduledTime,
+        notes: 'Leave pass with security gate',
+      );
+
+      expect(req.serviceType, 'Generator not picking load and producing heavy smoke');
+      expect(req.isCustom, isTrue);
+      expect(req.generator, '20kVA Mikano Soundproof Diesel');
+      expect(req.timing, GeneratorTiming.scheduled);
+      expect(req.scheduledFor, scheduledTime);
+      expect(req.notes, 'Leave pass with security gate');
+      expect(req.status, GeneratorRequestStatus.requested);
+    });
+
+    test('GeneratorTiming enum has expected values', () {
+      expect(GeneratorTiming.values, containsAll([
+        GeneratorTiming.asSoonAsPossible,
+        GeneratorTiming.laterToday,
+        GeneratorTiming.scheduled,
+      ]));
+    });
+
+    test('GeneratorRequestStatus enum has expected values', () {
+      expect(GeneratorRequestStatus.values, containsAll([
+        GeneratorRequestStatus.requested,
+        GeneratorRequestStatus.assigned,
+        GeneratorRequestStatus.inProgress,
+        GeneratorRequestStatus.completed,
+        GeneratorRequestStatus.cancelled,
+      ]));
+    });
+  });
+
+  group('SmartQ Estates - Phase 6F GeneratorRepository Tests', () {
+    late LocalGeneratorRepository repo;
+
+    setUp(() {
+      repo = LocalGeneratorRepository.testInstance();
+    });
+
+    test('createRequest stores and returns request', () {
+      final req = GeneratorRequest.create(
+        serviceType: 'ROUTINE SERVICING',
+        timing: GeneratorTiming.asSoonAsPossible,
+      );
+
+      final created = repo.createRequest(req);
+      expect(created.id, req.id);
+      expect(repo.getRequests().length, 1);
+      expect(repo.getRequests().first.id, req.id);
+    });
+
+    test('getRequests returns requests sorted by createdAt descending', () {
+      final first = GeneratorRequest.create(
+        serviceType: 'OIL & FILTER CHANGE',
+        timing: GeneratorTiming.laterToday,
+        createdAt: DateTime(2026, 1, 1, 10, 0),
+      );
+      final second = GeneratorRequest.create(
+        serviceType: 'REPAIR / FAULT',
+        timing: GeneratorTiming.asSoonAsPossible,
+        createdAt: DateTime(2026, 1, 1, 11, 0),
+      );
+
+      repo.createRequest(first);
+      repo.createRequest(second);
+
+      final list = repo.getRequests();
+      expect(list.length, 2);
+      expect(list[0].id, second.id);
+      expect(list[1].id, first.id);
+    });
+
+    test('getRequestById returns matching request or null', () {
+      final req = GeneratorRequest.create(
+        serviceType: 'GENERAL INSPECTION',
+        timing: GeneratorTiming.asSoonAsPossible,
+      );
+      repo.createRequest(req);
+
+      expect(repo.getRequestById(req.id)?.serviceType, 'GENERAL INSPECTION');
+      expect(repo.getRequestById('NON-EXISTENT'), isNull);
+    });
+
+    test('clear removes all requests', () {
+      repo.createRequest(GeneratorRequest.create(
+        serviceType: 'ROUTINE SERVICING',
+        timing: GeneratorTiming.laterToday,
+      ));
+      expect(repo.getRequests().length, 1);
+
+      repo.clear();
+      expect(repo.getRequests(), isEmpty);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6F GeneratorScreen Widget Tests', () {
+    late LocalGeneratorRepository testRepo;
+
+    setUp(() {
+      testRepo = LocalGeneratorRepository.testInstance();
+    });
+
+    testWidgets('GeneratorScreen renders header, subtitle, question, service options, generator field, and inputs',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorScreen(repository: testRepo),
+        ),
+      );
+
+      // Header & Subtitle
+      expect(find.text(AppStrings.generatorTitle), findsOneWidget);
+      expect(find.text(AppStrings.generatorHeaderSubtitle), findsOneWidget);
+
+      // Question section
+      expect(find.text(AppStrings.generatorQuestion), findsOneWidget);
+      expect(find.text(AppStrings.generatorQuestionSubtitle), findsOneWidget);
+
+      // Service options
+      expect(find.text(AppStrings.labelServiceType), findsOneWidget);
+      expect(find.text('ROUTINE SERVICING'), findsOneWidget);
+      expect(find.text('REPAIR / FAULT'), findsOneWidget);
+      expect(find.text('OIL & FILTER CHANGE'), findsOneWidget);
+      expect(find.text('GENERAL INSPECTION'), findsOneWidget);
+      expect(find.text('CUSTOM'), findsOneWidget);
+
+      // Generator (optional)
+      expect(find.text(AppStrings.labelGeneratorOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintGenerator), findsOneWidget);
+
+      // Timing options
+      expect(find.text(AppStrings.timingHeading), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+      expect(find.text(AppStrings.timingSchedule), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes (optional)
+      expect(find.text(AppStrings.labelNotesOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintGeneratorNotes), findsOneWidget);
+
+      // Submit button
+      expect(find.text(AppStrings.actionRequestGenerator), findsOneWidget);
+    });
+
+    testWidgets('Selecting service type updates selection',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorScreen(repository: testRepo),
+        ),
+      );
+
+      // Default is ROUTINE SERVICING, tap REPAIR / FAULT
+      await tester.tap(find.text('REPAIR / FAULT'));
+      await tester.pumpAndSettle();
+
+      // Custom field should not be present
+      expect(find.text(AppStrings.labelCustomService), findsNothing);
+    });
+
+    testWidgets('Selecting CUSTOM reveals custom service field and validates required',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorScreen(repository: testRepo),
+        ),
+      );
+
+      // Tap CUSTOM
+      await tester.ensureVisible(find.text('CUSTOM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CUSTOM'));
+      await tester.pumpAndSettle();
+
+      // Custom input field should appear
+      expect(find.text(AppStrings.labelCustomService), findsOneWidget);
+      expect(find.text(AppStrings.hintCustomGeneratorService), findsOneWidget);
+
+      // Tap submit with empty custom field
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorGeneratorServiceRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Can select timing options: ASAP, LATER TODAY, SCHEDULE',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorScreen(repository: testRepo),
+        ),
+      );
+
+      // Select LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Select Date'), findsNothing);
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Select Date'), findsOneWidget);
+      expect(find.text('Select Time'), findsOneWidget);
+    });
+
+    testWidgets('SCHEDULE without choosing date/time displays error when submitting',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorScreen(repository: testRepo),
+        ),
+      );
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Tap submit without setting date/time
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorScheduledRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Valid submission with generator and notes saves request to repo and navigates to requested screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Enter optional generator
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintGenerator));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGenerator),
+        '5kVA Firman',
+      );
+      await tester.pumpAndSettle();
+
+      // Enter optional notes
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintGeneratorNotes));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGeneratorNotes),
+        'Technician should call before entering.',
+      );
+      await tester.pumpAndSettle();
+
+      // Tap submit (default ROUTINE SERVICING, ASAP)
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+
+      // Verify request in repository
+      final requests = testRepo.getRequests();
+      expect(requests.length, 1);
+      expect(requests.first.serviceType, 'ROUTINE SERVICING');
+      expect(requests.first.isCustom, isFalse);
+      expect(requests.first.generator, '5kVA Firman');
+      expect(requests.first.notes, 'Technician should call before entering.');
+      expect(requests.first.timing, GeneratorTiming.asSoonAsPossible);
+      expect(requests.first.status, GeneratorRequestStatus.requested);
+
+      // Verify transition to GeneratorRequestedScreen
+      expect(find.byType(GeneratorRequestedScreen), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.generatorRequestReceivedSubtitle), findsOneWidget);
+      expect(find.text('ROUTINE SERVICING'), findsOneWidget);
+      expect(find.text(AppStrings.labelGenerator), findsOneWidget);
+      expect(find.text('5kVA Firman'), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+      expect(find.text('Technician should call before entering.'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6F GeneratorRequestedScreen Tests', () {
+    testWidgets('Displays all request details including generator and notes when provided',
+        (WidgetTester tester) async {
+      final request = GeneratorRequest.create(
+        serviceType: 'OIL & FILTER CHANGE',
+        generator: '10kVA Lutian',
+        timing: GeneratorTiming.laterToday,
+        notes: 'Oil has been bought already.',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorRequestedScreen(request: request),
+        ),
+      );
+
+      // Header & subtitle
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.generatorRequestReceivedSubtitle), findsOneWidget);
+
+      // Service requested
+      expect(find.text(AppStrings.labelServiceRequested), findsOneWidget);
+      expect(find.text('OIL & FILTER CHANGE'), findsOneWidget);
+
+      // Generator
+      expect(find.text(AppStrings.labelGenerator), findsOneWidget);
+      expect(find.text('10kVA Lutian'), findsOneWidget);
+
+      // When
+      expect(find.text(AppStrings.labelWhen), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes
+      expect(find.text(AppStrings.labelNotes), findsOneWidget);
+      expect(find.text('Oil has been bought already.'), findsOneWidget);
+
+      // Done button
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('Does not display generator or notes sections when they are null or empty',
+        (WidgetTester tester) async {
+      final request = GeneratorRequest.create(
+        serviceType: 'GENERAL INSPECTION',
+        timing: GeneratorTiming.asSoonAsPossible,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GeneratorRequestedScreen(request: request),
+        ),
+      );
+
+      expect(find.text(AppStrings.labelServiceRequested), findsOneWidget);
+      expect(find.text('GENERAL INSPECTION'), findsOneWidget);
+      expect(find.text(AppStrings.labelGenerator), findsNothing);
+      expect(find.text(AppStrings.labelNotes), findsNothing);
+    });
+
+    testWidgets('DONE button returns to Services Home',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouter.services),
+                child: const Text('GO TO SERVICES'),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Open ServicesHomeScreen with named route
+      await tester.tap(find.text('GO TO SERVICES'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Navigate to GeneratorScreen
+      await tester.ensureVisible(find.text(AppStrings.generatorTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.generatorTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GeneratorScreen), findsOneWidget);
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestGenerator));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(GeneratorRequestedScreen), findsOneWidget);
+
+      // Tap DONE
+      await tester.ensureVisible(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+
+      // Returns to ServicesHomeScreen
+      expect(find.byType(GeneratorRequestedScreen), findsNothing);
+      expect(find.byType(GeneratorScreen), findsNothing);
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
   });
