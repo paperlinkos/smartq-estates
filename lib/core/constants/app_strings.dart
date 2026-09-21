@@ -329,5 +329,25 @@ class AppStrings {
   static const String errorGasQuantityRequired =
       'Please select or enter a cylinder quantity.';
   static const String labelQuantityRequested = 'QUANTITY';
+
+  // Phase 6E — Petrol Request
+  static const String petrolHeaderSubtitle = 'REQUEST FUEL DELIVERY.';
+  static const String petrolQuestion = 'HOW MUCH FUEL DO YOU NEED?';
+  static const String petrolQuestionSubtitle =
+      'Select a quantity or enter a custom amount.';
+  static const String labelFuelQuantity = 'FUEL QUANTITY';
+  static const String labelCustomLiters = 'CUSTOM QUANTITY (LITERS)';
+  static const String hintCustomPetrolQuantity = 'e.g. 25 or 50';
+  static const String labelVehicleOptional = 'VEHICLE (OPTIONAL)';
+  static const String hintVehicle =
+      'e.g. Black Toyota Camry or Generator fuel tank';
+  static const String hintPetrolNotes =
+      'Anything else the delivery person should know.';
+  static const String actionRequestPetrol = 'REQUEST PETROL';
+  static const String petrolRequestReceivedSubtitle =
+      "We've received your petrol delivery request.";
+  static const String errorPetrolQuantityRequired =
+      'Please select or enter a fuel quantity.';
+  static const String labelVehicle = 'VEHICLE';
 }
 

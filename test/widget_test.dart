@@ -60,6 +60,12 @@ import 'package:smartq_estates/core/models/gas_request.dart';
 import 'package:smartq_estates/core/repositories/gas_repository.dart';
 import 'package:smartq_estates/screens/services/gas_screen.dart';
 import 'package:smartq_estates/screens/services/gas_requested_screen.dart';
+// Phase 6E imports
+import 'package:smartq_estates/core/models/petrol_request.dart';
+import 'package:smartq_estates/core/repositories/petrol_repository.dart';
+import 'package:smartq_estates/screens/services/petrol_screen.dart';
+import 'package:smartq_estates/screens/services/petrol_requested_screen.dart';
+
 
 void main() {
   group('SmartQ Estates - Phase 1 Foundation Tests', () {
@@ -2169,9 +2175,21 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
 
-      // Remaining 3 services navigate to placeholder screens
-      await testCardNavigation(AppStrings.petrolTitle,
-          services_placeholders.PetrolPlaceholderScreen);
+      // Petrol navigates to PetrolScreen (Phase 6E)
+      await tester.ensureVisible(find.text(AppStrings.petrolTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.petrolTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(PetrolScreen), findsOneWidget);
+      final petrolBackButton = find.descendant(
+        of: find.byType(PetrolScreen),
+        matching: find.byIcon(Icons.arrow_back),
+      );
+      await tester.tap(petrolBackButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Remaining 2 services navigate to placeholder screens
       await testCardNavigation(AppStrings.generatorTitle,
           services_placeholders.GeneratorPlaceholderScreen);
       await testCardNavigation(AppStrings.maintenanceTitle,
@@ -3426,6 +3444,446 @@ void main() {
       // Returns to ServicesHomeScreen
       expect(find.byType(GasRequestedScreen), findsNothing);
       expect(find.byType(GasScreen), findsNothing);
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6E PetrolRequest Model Tests', () {
+    test('PetrolRequest.create initializes defaults and fields', () {
+      final req = PetrolRequest.create(
+        quantity: '20 L',
+        timing: PetrolTiming.asSoonAsPossible,
+      );
+
+      expect(req.id.startsWith('PETROL-'), isTrue);
+      expect(req.quantity, '20 L');
+      expect(req.isCustom, isFalse);
+      expect(req.vehicle, isNull);
+      expect(req.timing, PetrolTiming.asSoonAsPossible);
+      expect(req.scheduledFor, isNull);
+      expect(req.deliveryLocation, 'estateAddress');
+      expect(req.notes, isNull);
+      expect(req.status, PetrolRequestStatus.requested);
+      expect(req.createdAt, isNotNull);
+    });
+
+    test('PetrolRequest supports custom quantity, vehicle, scheduled timing and optional notes', () {
+      final scheduledTime = DateTime.now().add(const Duration(days: 1));
+      final req = PetrolRequest.create(
+        quantity: '55 L',
+        isCustom: true,
+        vehicle: 'Black Toyota Camry',
+        timing: PetrolTiming.scheduled,
+        scheduledFor: scheduledTime,
+        notes: 'Leave with security if not home',
+      );
+
+      expect(req.quantity, '55 L');
+      expect(req.isCustom, isTrue);
+      expect(req.vehicle, 'Black Toyota Camry');
+      expect(req.timing, PetrolTiming.scheduled);
+      expect(req.scheduledFor, scheduledTime);
+      expect(req.notes, 'Leave with security if not home');
+      expect(req.status, PetrolRequestStatus.requested);
+    });
+
+    test('PetrolTiming enum has expected values', () {
+      expect(PetrolTiming.values, containsAll([
+        PetrolTiming.asSoonAsPossible,
+        PetrolTiming.laterToday,
+        PetrolTiming.scheduled,
+      ]));
+    });
+
+    test('PetrolRequestStatus enum has expected values', () {
+      expect(PetrolRequestStatus.values, containsAll([
+        PetrolRequestStatus.requested,
+        PetrolRequestStatus.assigned,
+        PetrolRequestStatus.refuelling,
+        PetrolRequestStatus.outForDelivery,
+        PetrolRequestStatus.delivered,
+        PetrolRequestStatus.cancelled,
+      ]));
+    });
+  });
+
+  group('SmartQ Estates - Phase 6E PetrolRepository Tests', () {
+    late LocalPetrolRepository repo;
+
+    setUp(() {
+      repo = LocalPetrolRepository.testInstance();
+    });
+
+    test('createRequest stores and returns request', () {
+      final req = PetrolRequest.create(
+        quantity: '10 L',
+        timing: PetrolTiming.asSoonAsPossible,
+      );
+
+      final created = repo.createRequest(req);
+      expect(created.id, req.id);
+      expect(repo.getRequests().length, 1);
+      expect(repo.getRequests().first.id, req.id);
+    });
+
+    test('getRequests returns requests sorted by createdAt descending', () {
+      final first = PetrolRequest.create(
+        quantity: '5 L',
+        timing: PetrolTiming.laterToday,
+        createdAt: DateTime(2026, 1, 1, 10, 0),
+      );
+      final second = PetrolRequest.create(
+        quantity: '30 L',
+        timing: PetrolTiming.asSoonAsPossible,
+        createdAt: DateTime(2026, 1, 1, 11, 0),
+      );
+
+      repo.createRequest(first);
+      repo.createRequest(second);
+
+      final list = repo.getRequests();
+      expect(list.length, 2);
+      expect(list[0].id, second.id);
+      expect(list[1].id, first.id);
+    });
+
+    test('getRequestById returns matching request or null', () {
+      final req = PetrolRequest.create(
+        quantity: '40 L',
+        timing: PetrolTiming.asSoonAsPossible,
+      );
+      repo.createRequest(req);
+
+      expect(repo.getRequestById(req.id)?.quantity, '40 L');
+      expect(repo.getRequestById('NON-EXISTENT'), isNull);
+    });
+
+    test('clear removes all requests', () {
+      repo.createRequest(PetrolRequest.create(
+        quantity: '5 L',
+        timing: PetrolTiming.laterToday,
+      ));
+      expect(repo.getRequests().length, 1);
+
+      repo.clear();
+      expect(repo.getRequests(), isEmpty);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6E PetrolScreen Widget Tests', () {
+    late LocalPetrolRepository testRepo;
+
+    setUp(() {
+      testRepo = LocalPetrolRepository.testInstance();
+    });
+
+    testWidgets('PetrolScreen renders header, subtitle, question, fuel quantities, vehicle field, and inputs',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolScreen(repository: testRepo),
+        ),
+      );
+
+      // Header & Subtitle
+      expect(find.text(AppStrings.petrolTitle), findsOneWidget);
+      expect(find.text(AppStrings.petrolHeaderSubtitle), findsOneWidget);
+
+      // Question section
+      expect(find.text(AppStrings.petrolQuestion), findsOneWidget);
+      expect(find.text(AppStrings.petrolQuestionSubtitle), findsOneWidget);
+
+      // Fuel quantities
+      expect(find.text(AppStrings.labelFuelQuantity), findsOneWidget);
+      expect(find.text('5 L'), findsOneWidget);
+      expect(find.text('10 L'), findsOneWidget);
+      expect(find.text('20 L'), findsOneWidget);
+      expect(find.text('30 L'), findsOneWidget);
+      expect(find.text('40 L'), findsOneWidget);
+      expect(find.text('CUSTOM'), findsOneWidget);
+
+      // Vehicle (optional)
+      expect(find.text(AppStrings.labelVehicleOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintVehicle), findsOneWidget);
+
+      // Timing options
+      expect(find.text(AppStrings.timingHeading), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+      expect(find.text(AppStrings.timingSchedule), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes (optional)
+      expect(find.text(AppStrings.labelNotesOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintPetrolNotes), findsOneWidget);
+
+      // Submit button
+      expect(find.text(AppStrings.actionRequestPetrol), findsOneWidget);
+    });
+
+    testWidgets('Selecting fuel quantity updates selection',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolScreen(repository: testRepo),
+        ),
+      );
+
+      // Default is 20 L, tap 10 L
+      await tester.tap(find.text('10 L'));
+      await tester.pumpAndSettle();
+
+      // Custom field should not be present
+      expect(find.text(AppStrings.labelCustomLiters), findsNothing);
+    });
+
+    testWidgets('Selecting CUSTOM reveals custom quantity field and validates required',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolScreen(repository: testRepo),
+        ),
+      );
+
+      // Tap CUSTOM
+      await tester.ensureVisible(find.text('CUSTOM'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('CUSTOM'));
+      await tester.pumpAndSettle();
+
+      // Custom input field should appear
+      expect(find.text(AppStrings.labelCustomLiters), findsOneWidget);
+      expect(find.text(AppStrings.hintCustomPetrolQuantity), findsOneWidget);
+
+      // Tap submit with empty custom field
+      await tester.ensureVisible(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorPetrolQuantityRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Can select timing options: ASAP, LATER TODAY, SCHEDULE',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolScreen(repository: testRepo),
+        ),
+      );
+
+      // Select LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Select Date'), findsNothing);
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Select Date'), findsOneWidget);
+      expect(find.text('Select Time'), findsOneWidget);
+    });
+
+    testWidgets('SCHEDULE without choosing date/time displays error when submitting',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolScreen(repository: testRepo),
+        ),
+      );
+
+      // Select SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Tap submit without setting date/time
+      await tester.ensureVisible(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorScheduledRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Valid submission with vehicle and notes saves request to repo and navigates to requested screen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Enter optional vehicle
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintVehicle));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintVehicle),
+        'Black Toyota Camry',
+      );
+      await tester.pumpAndSettle();
+
+      // Enter optional notes
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintPetrolNotes));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintPetrolNotes),
+        'Please call when arriving at the gate.',
+      );
+      await tester.pumpAndSettle();
+
+      // Tap submit (default 20 L, ASAP)
+      await tester.ensureVisible(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+
+      // Verify request in repository
+      final requests = testRepo.getRequests();
+      expect(requests.length, 1);
+      expect(requests.first.quantity, '20 L');
+      expect(requests.first.isCustom, isFalse);
+      expect(requests.first.vehicle, 'Black Toyota Camry');
+      expect(requests.first.notes, 'Please call when arriving at the gate.');
+      expect(requests.first.timing, PetrolTiming.asSoonAsPossible);
+      expect(requests.first.status, PetrolRequestStatus.requested);
+
+      // Verify transition to PetrolRequestedScreen
+      expect(find.byType(PetrolRequestedScreen), findsOneWidget);
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.petrolRequestReceivedSubtitle), findsOneWidget);
+      expect(find.text('20 L'), findsOneWidget);
+      expect(find.text(AppStrings.labelVehicle), findsOneWidget);
+      expect(find.text('Black Toyota Camry'), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+      expect(find.text('Please call when arriving at the gate.'), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6E PetrolRequestedScreen Tests', () {
+    testWidgets('Displays all request details including vehicle and notes when provided',
+        (WidgetTester tester) async {
+      final request = PetrolRequest.create(
+        quantity: '40 L',
+        vehicle: 'Silver Honda Accord',
+        timing: PetrolTiming.laterToday,
+        notes: 'Leave petrol near the generator house.',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolRequestedScreen(request: request),
+        ),
+      );
+
+      // Header & subtitle
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.petrolRequestReceivedSubtitle), findsOneWidget);
+
+      // Quantity
+      expect(find.text(AppStrings.labelQuantityRequested), findsOneWidget);
+      expect(find.text('40 L'), findsOneWidget);
+
+      // Vehicle
+      expect(find.text(AppStrings.labelVehicle), findsOneWidget);
+      expect(find.text('Silver Honda Accord'), findsOneWidget);
+
+      // When
+      expect(find.text(AppStrings.labelWhen), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes
+      expect(find.text(AppStrings.labelNotes), findsOneWidget);
+      expect(find.text('Leave petrol near the generator house.'), findsOneWidget);
+
+      // Done button
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('Does not display vehicle or notes sections when they are null or empty',
+        (WidgetTester tester) async {
+      final request = PetrolRequest.create(
+        quantity: '10 L',
+        timing: PetrolTiming.asSoonAsPossible,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PetrolRequestedScreen(request: request),
+        ),
+      );
+
+      expect(find.text(AppStrings.labelQuantityRequested), findsOneWidget);
+      expect(find.text('10 L'), findsOneWidget);
+      expect(find.text(AppStrings.labelVehicle), findsNothing);
+      expect(find.text(AppStrings.labelNotes), findsNothing);
+    });
+
+    testWidgets('DONE button returns to Services Home',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouter.services),
+                child: const Text('GO TO SERVICES'),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Open ServicesHomeScreen with named route
+      await tester.tap(find.text('GO TO SERVICES'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Navigate to PetrolScreen
+      await tester.ensureVisible(find.text(AppStrings.petrolTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.petrolTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PetrolScreen), findsOneWidget);
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestPetrol));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(PetrolRequestedScreen), findsOneWidget);
+
+      // Tap DONE
+      await tester.ensureVisible(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+
+      // Returns to ServicesHomeScreen
+      expect(find.byType(PetrolRequestedScreen), findsNothing);
+      expect(find.byType(PetrolScreen), findsNothing);
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
   });

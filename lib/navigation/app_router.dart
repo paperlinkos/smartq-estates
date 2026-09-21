@@ -6,6 +6,7 @@ import '../core/models/event_pass.dart';
 import '../core/models/gas_request.dart';
 import '../core/models/grocery_request.dart';
 import '../core/models/market_run_request.dart';
+import '../core/models/petrol_request.dart';
 import '../core/models/visitor_pass.dart';
 import '../screens/estate_selection/estate_selection_screen.dart';
 import '../screens/main_shell/main_shell_screen.dart';
@@ -21,6 +22,8 @@ import '../screens/services/groceries_screen.dart';
 import '../screens/services/groceries_requested_screen.dart';
 import '../screens/services/market_run_screen.dart';
 import '../screens/services/market_run_requested_screen.dart';
+import '../screens/services/petrol_screen.dart';
+import '../screens/services/petrol_requested_screen.dart';
 import '../screens/services/services_home_screen.dart';
 import '../screens/services/service_placeholder_screens.dart' as services_placeholders;
 import '../screens/splash/splash_screen.dart';
@@ -46,7 +49,7 @@ class AppRouter {
   static const String maintenance = '/maintenance';
   static const String payments = '/payments';
 
-  // Services category routes (Phase 6A, 6B, 6C & 6D)
+  // Services category routes (Phase 6A, 6B, 6C, 6D & 6E)
   static const String marketRun = '/services/market-run';
   static const String marketRunRequested = '/services/market-run/requested';
   static const String groceries = '/services/groceries';
@@ -54,6 +57,7 @@ class AppRouter {
   static const String gas = '/services/gas';
   static const String gasRequested = '/services/gas/requested';
   static const String petrol = '/services/petrol';
+  static const String petrolRequested = '/services/petrol/requested';
   static const String generator = '/services/generator';
   static const String serviceMaintenance = '/services/maintenance';
 
@@ -169,8 +173,13 @@ class AppRouter {
         );
       case petrol:
         return MaterialPageRoute(
-          builder: (_) =>
-              const services_placeholders.PetrolPlaceholderScreen(),
+          builder: (_) => const PetrolScreen(),
+          settings: settings,
+        );
+      case petrolRequested:
+        final request = settings.arguments as PetrolRequest;
+        return MaterialPageRoute(
+          builder: (_) => PetrolRequestedScreen(request: request),
           settings: settings,
         );
       case generator:
