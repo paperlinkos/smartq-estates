@@ -23,24 +23,15 @@ class GeneratorScreen extends StatefulWidget {
 }
 
 class _GeneratorScreenState extends State<GeneratorScreen> {
-  static const List<String> _standardServices = [
-    'ROUTINE SERVICING',
-    'REPAIR / FAULT',
-    'OIL & FILTER CHANGE',
-    'GENERAL INSPECTION',
-    'CUSTOM',
-  ];
-
-  String _selectedService = 'ROUTINE SERVICING';
-  final _customServiceController = TextEditingController();
-  final _generatorController = TextEditingController();
+  final _serviceDescriptionController = TextEditingController();
+  final _generatorModelController = TextEditingController();
   final _notesController = TextEditingController();
 
   GeneratorTiming _selectedTiming = GeneratorTiming.asSoonAsPossible;
   DateTime? _scheduledDate;
   TimeOfDay? _scheduledTime;
 
-  String? _serviceError;
+  String? _serviceDescriptionError;
   String? _scheduleError;
 
   GeneratorRepository get _repo =>
@@ -48,8 +39,8 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
   @override
   void dispose() {
-    _customServiceController.dispose();
-    _generatorController.dispose();
+    _serviceDescriptionController.dispose();
+    _generatorModelController.dispose();
     _notesController.dispose();
     super.dispose();
   }
@@ -128,21 +119,18 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
   }
 
   void _submit() {
-    final isCustom = _selectedService == 'CUSTOM';
-    final customVal = _customServiceController.text.trim();
+    final description = _serviceDescriptionController.text.trim();
 
-    if (isCustom && customVal.isEmpty) {
+    if (description.isEmpty) {
       setState(() {
-        _serviceError = AppStrings.errorGeneratorServiceRequired;
+        _serviceDescriptionError = AppStrings.errorGeneratorDescriptionRequired;
       });
       return;
     } else {
       setState(() {
-        _serviceError = null;
+        _serviceDescriptionError = null;
       });
     }
-
-    final effectiveService = isCustom ? customVal : _selectedService;
 
     DateTime? scheduledDateTime;
     if (_selectedTiming == GeneratorTiming.scheduled) {
@@ -174,9 +162,8 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
     }
 
     final request = GeneratorRequest.create(
-      serviceType: effectiveService,
-      isCustom: isCustom,
-      generator: _generatorController.text,
+      serviceDescription: description,
+      generatorModel: _generatorModelController.text,
       timing: _selectedTiming,
       scheduledFor: scheduledDateTime,
       deliveryLocation: 'estateAddress',
@@ -193,8 +180,6 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCustom = _selectedService == 'CUSTOM';
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppHeader(
@@ -231,87 +216,32 @@ class _GeneratorScreenState extends State<GeneratorScreen> {
 
               const SizedBox(height: 20),
 
-              // ── Service Type Options ──────────────────────────────────
-              _buildSectionLabel(AppStrings.labelServiceType),
+              // ── Service Description (Required) ────────────────────────
+              _buildSectionLabel(AppStrings.labelServiceDescription),
               const SizedBox(height: 8),
-              Column(
-                children: _standardServices.map((service) {
-                  final isSelected = _selectedService == service;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: AppCard(
-                      onTap: () {
-                        setState(() {
-                          _selectedService = service;
-                          _serviceError = null;
-                        });
-                      },
-                      backgroundColor:
-                          isSelected ? AppColors.black : AppColors.surface,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              service,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? AppColors.white
-                                    : AppColors.textPrimary,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                          if (isSelected)
-                            const Icon(
-                              Icons.check_circle_rounded,
-                              size: 18,
-                              color: AppColors.white,
-                            )
-                          else
-                            const Icon(
-                              Icons.radio_button_unchecked_rounded,
-                              size: 18,
-                              color: AppColors.gray400,
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
+              AppTextField(
+                controller: _serviceDescriptionController,
+                hintText: AppStrings.hintGeneratorServiceDescription,
+                errorText: _serviceDescriptionError,
+                minLines: 4,
+                maxLines: 8,
+                textCapitalization: TextCapitalization.sentences,
+                onChanged: (val) {
+                  if (_serviceDescriptionError != null &&
+                      val.trim().isNotEmpty) {
+                    setState(() => _serviceDescriptionError = null);
+                  }
+                },
               ),
-
-              // ── Custom Service Input (Conditional) ────────────────────
-              if (isCustom) ...[
-                const SizedBox(height: 12),
-                _buildSectionLabel(AppStrings.labelCustomService),
-                const SizedBox(height: 8),
-                AppTextField(
-                  controller: _customServiceController,
-                  hintText: AppStrings.hintCustomGeneratorService,
-                  errorText: _serviceError,
-                  minLines: 1,
-                  maxLines: 2,
-                  onChanged: (val) {
-                    if (_serviceError != null && val.trim().isNotEmpty) {
-                      setState(() => _serviceError = null);
-                    }
-                  },
-                ),
-              ],
 
               const SizedBox(height: 24),
 
-              // ── Generator Details (Optional) ──────────────────────────
-              _buildSectionLabel(AppStrings.labelGeneratorOptional),
+              // ── Generator Type or Model (Optional) ────────────────────
+              _buildSectionLabel(AppStrings.labelGeneratorModelOptional),
               const SizedBox(height: 8),
               AppTextField(
-                controller: _generatorController,
-                hintText: AppStrings.hintGenerator,
+                controller: _generatorModelController,
+                hintText: AppStrings.hintGeneratorModel,
                 minLines: 1,
                 maxLines: 2,
                 textCapitalization: TextCapitalization.words,

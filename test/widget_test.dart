@@ -3909,14 +3909,13 @@ void main() {
   group('SmartQ Estates - Phase 6F GeneratorRequest Model Tests', () {
     test('GeneratorRequest.create initializes defaults and fields', () {
       final req = GeneratorRequest.create(
-        serviceType: 'ROUTINE SERVICING',
+        serviceDescription: 'Needs oil change and spark plug check',
         timing: GeneratorTiming.asSoonAsPossible,
       );
 
       expect(req.id.startsWith('GEN-'), isTrue);
-      expect(req.serviceType, 'ROUTINE SERVICING');
-      expect(req.isCustom, isFalse);
-      expect(req.generator, isNull);
+      expect(req.serviceDescription, 'Needs oil change and spark plug check');
+      expect(req.generatorModel, isNull);
       expect(req.timing, GeneratorTiming.asSoonAsPossible);
       expect(req.scheduledFor, isNull);
       expect(req.deliveryLocation, 'estateAddress');
@@ -3925,20 +3924,18 @@ void main() {
       expect(req.createdAt, isNotNull);
     });
 
-    test('GeneratorRequest supports custom service, generator, scheduled timing and optional notes', () {
+    test('GeneratorRequest supports optional generatorModel, scheduled timing and optional notes', () {
       final scheduledTime = DateTime.now().add(const Duration(days: 1));
       final req = GeneratorRequest.create(
-        serviceType: 'Generator not picking load and producing heavy smoke',
-        isCustom: true,
-        generator: '20kVA Mikano Soundproof Diesel',
+        serviceDescription: 'Generator not picking load and producing heavy smoke',
+        generatorModel: '20kVA Mikano Soundproof Diesel',
         timing: GeneratorTiming.scheduled,
         scheduledFor: scheduledTime,
         notes: 'Leave pass with security gate',
       );
 
-      expect(req.serviceType, 'Generator not picking load and producing heavy smoke');
-      expect(req.isCustom, isTrue);
-      expect(req.generator, '20kVA Mikano Soundproof Diesel');
+      expect(req.serviceDescription, 'Generator not picking load and producing heavy smoke');
+      expect(req.generatorModel, '20kVA Mikano Soundproof Diesel');
       expect(req.timing, GeneratorTiming.scheduled);
       expect(req.scheduledFor, scheduledTime);
       expect(req.notes, 'Leave pass with security gate');
@@ -3973,7 +3970,7 @@ void main() {
 
     test('createRequest stores and returns request', () {
       final req = GeneratorRequest.create(
-        serviceType: 'ROUTINE SERVICING',
+        serviceDescription: 'Needs routine servicing',
         timing: GeneratorTiming.asSoonAsPossible,
       );
 
@@ -3985,12 +3982,12 @@ void main() {
 
     test('getRequests returns requests sorted by createdAt descending', () {
       final first = GeneratorRequest.create(
-        serviceType: 'OIL & FILTER CHANGE',
+        serviceDescription: 'Oil and filter change',
         timing: GeneratorTiming.laterToday,
         createdAt: DateTime(2026, 1, 1, 10, 0),
       );
       final second = GeneratorRequest.create(
-        serviceType: 'REPAIR / FAULT',
+        serviceDescription: 'Won’t start',
         timing: GeneratorTiming.asSoonAsPossible,
         createdAt: DateTime(2026, 1, 1, 11, 0),
       );
@@ -4006,18 +4003,19 @@ void main() {
 
     test('getRequestById returns matching request or null', () {
       final req = GeneratorRequest.create(
-        serviceType: 'GENERAL INSPECTION',
+        serviceDescription: 'General inspection before weekend',
         timing: GeneratorTiming.asSoonAsPossible,
       );
       repo.createRequest(req);
 
-      expect(repo.getRequestById(req.id)?.serviceType, 'GENERAL INSPECTION');
+      expect(repo.getRequestById(req.id)?.serviceDescription,
+          'General inspection before weekend');
       expect(repo.getRequestById('NON-EXISTENT'), isNull);
     });
 
     test('clear removes all requests', () {
       repo.createRequest(GeneratorRequest.create(
-        serviceType: 'ROUTINE SERVICING',
+        serviceDescription: 'Needs servicing',
         timing: GeneratorTiming.laterToday,
       ));
       expect(repo.getRequests().length, 1);
@@ -4034,7 +4032,7 @@ void main() {
       testRepo = LocalGeneratorRepository.testInstance();
     });
 
-    testWidgets('GeneratorScreen renders header, subtitle, question, service options, generator field, and inputs',
+    testWidgets('GeneratorScreen renders header, subtitle, question, service description, generator field, and inputs',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -4050,17 +4048,13 @@ void main() {
       expect(find.text(AppStrings.generatorQuestion), findsOneWidget);
       expect(find.text(AppStrings.generatorQuestionSubtitle), findsOneWidget);
 
-      // Service options
-      expect(find.text(AppStrings.labelServiceType), findsOneWidget);
-      expect(find.text('ROUTINE SERVICING'), findsOneWidget);
-      expect(find.text('REPAIR / FAULT'), findsOneWidget);
-      expect(find.text('OIL & FILTER CHANGE'), findsOneWidget);
-      expect(find.text('GENERAL INSPECTION'), findsOneWidget);
-      expect(find.text('CUSTOM'), findsOneWidget);
+      // Service description field
+      expect(find.text(AppStrings.labelServiceDescription), findsOneWidget);
+      expect(find.text(AppStrings.hintGeneratorServiceDescription), findsOneWidget);
 
       // Generator (optional)
-      expect(find.text(AppStrings.labelGeneratorOptional), findsOneWidget);
-      expect(find.text(AppStrings.hintGenerator), findsOneWidget);
+      expect(find.text(AppStrings.labelGeneratorModelOptional), findsOneWidget);
+      expect(find.text(AppStrings.hintGeneratorModel), findsOneWidget);
 
       // Timing options
       expect(find.text(AppStrings.timingHeading), findsOneWidget);
@@ -4080,7 +4074,7 @@ void main() {
       expect(find.text(AppStrings.actionRequestGenerator), findsOneWidget);
     });
 
-    testWidgets('Selecting service type updates selection',
+    testWidgets('Submitting with empty service description displays validation error',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -4088,39 +4082,13 @@ void main() {
         ),
       );
 
-      // Default is ROUTINE SERVICING, tap REPAIR / FAULT
-      await tester.tap(find.text('REPAIR / FAULT'));
-      await tester.pumpAndSettle();
-
-      // Custom field should not be present
-      expect(find.text(AppStrings.labelCustomService), findsNothing);
-    });
-
-    testWidgets('Selecting CUSTOM reveals custom service field and validates required',
-        (WidgetTester tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: GeneratorScreen(repository: testRepo),
-        ),
-      );
-
-      // Tap CUSTOM
-      await tester.ensureVisible(find.text('CUSTOM'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('CUSTOM'));
-      await tester.pumpAndSettle();
-
-      // Custom input field should appear
-      expect(find.text(AppStrings.labelCustomService), findsOneWidget);
-      expect(find.text(AppStrings.hintCustomGeneratorService), findsOneWidget);
-
-      // Tap submit with empty custom field
+      // Tap submit with empty service description
       await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));
       await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.actionRequestGenerator));
       await tester.pumpAndSettle();
 
-      expect(find.text(AppStrings.errorGeneratorServiceRequired), findsOneWidget);
+      expect(find.text(AppStrings.errorGeneratorDescriptionRequired), findsOneWidget);
       expect(testRepo.getRequests(), isEmpty);
     });
 
@@ -4158,6 +4126,13 @@ void main() {
         ),
       );
 
+      // Enter service description first
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGeneratorServiceDescription),
+        'Generator won’t start',
+      );
+      await tester.pumpAndSettle();
+
       // Select SCHEDULE
       await tester.ensureVisible(find.text(AppStrings.timingSchedule));
       await tester.pumpAndSettle();
@@ -4183,11 +4158,18 @@ void main() {
         ),
       );
 
-      // Enter optional generator
-      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintGenerator));
+      // Enter service description
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGeneratorServiceDescription),
+        'Generator produces black smoke and won’t carry AC load.',
+      );
+      await tester.pumpAndSettle();
+
+      // Enter optional generator model
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintGeneratorModel));
       await tester.pumpAndSettle();
       await tester.enterText(
-        find.widgetWithText(TextField, AppStrings.hintGenerator),
+        find.widgetWithText(TextField, AppStrings.hintGeneratorModel),
         '5kVA Firman',
       );
       await tester.pumpAndSettle();
@@ -4201,7 +4183,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Tap submit (default ROUTINE SERVICING, ASAP)
+      // Tap submit (ASAP)
       await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));
       await tester.pumpAndSettle();
       await tester.tap(find.text(AppStrings.actionRequestGenerator));
@@ -4210,9 +4192,9 @@ void main() {
       // Verify request in repository
       final requests = testRepo.getRequests();
       expect(requests.length, 1);
-      expect(requests.first.serviceType, 'ROUTINE SERVICING');
-      expect(requests.first.isCustom, isFalse);
-      expect(requests.first.generator, '5kVA Firman');
+      expect(requests.first.serviceDescription,
+          'Generator produces black smoke and won’t carry AC load.');
+      expect(requests.first.generatorModel, '5kVA Firman');
       expect(requests.first.notes, 'Technician should call before entering.');
       expect(requests.first.timing, GeneratorTiming.asSoonAsPossible);
       expect(requests.first.status, GeneratorRequestStatus.requested);
@@ -4221,8 +4203,9 @@ void main() {
       expect(find.byType(GeneratorRequestedScreen), findsOneWidget);
       expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
       expect(find.text(AppStrings.generatorRequestReceivedSubtitle), findsOneWidget);
-      expect(find.text('ROUTINE SERVICING'), findsOneWidget);
-      expect(find.text(AppStrings.labelGenerator), findsOneWidget);
+      expect(find.text('Generator produces black smoke and won’t carry AC load.'),
+          findsOneWidget);
+      expect(find.text(AppStrings.labelGeneratorSummary), findsOneWidget);
       expect(find.text('5kVA Firman'), findsOneWidget);
       expect(find.text(AppStrings.timingAsap), findsOneWidget);
       expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
@@ -4234,8 +4217,8 @@ void main() {
     testWidgets('Displays all request details including generator and notes when provided',
         (WidgetTester tester) async {
       final request = GeneratorRequest.create(
-        serviceType: 'OIL & FILTER CHANGE',
-        generator: '10kVA Lutian',
+        serviceDescription: 'Oil change and filter replacement needed',
+        generatorModel: '10kVA Lutian',
         timing: GeneratorTiming.laterToday,
         notes: 'Oil has been bought already.',
       );
@@ -4250,12 +4233,12 @@ void main() {
       expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
       expect(find.text(AppStrings.generatorRequestReceivedSubtitle), findsOneWidget);
 
-      // Service requested
-      expect(find.text(AppStrings.labelServiceRequested), findsOneWidget);
-      expect(find.text('OIL & FILTER CHANGE'), findsOneWidget);
+      // Service description
+      expect(find.text(AppStrings.labelServiceDescriptionSummary), findsOneWidget);
+      expect(find.text('Oil change and filter replacement needed'), findsOneWidget);
 
       // Generator
-      expect(find.text(AppStrings.labelGenerator), findsOneWidget);
+      expect(find.text(AppStrings.labelGeneratorSummary), findsOneWidget);
       expect(find.text('10kVA Lutian'), findsOneWidget);
 
       // When
@@ -4277,7 +4260,7 @@ void main() {
     testWidgets('Does not display generator or notes sections when they are null or empty',
         (WidgetTester tester) async {
       final request = GeneratorRequest.create(
-        serviceType: 'GENERAL INSPECTION',
+        serviceDescription: 'General inspection before weekend',
         timing: GeneratorTiming.asSoonAsPossible,
       );
 
@@ -4287,9 +4270,9 @@ void main() {
         ),
       );
 
-      expect(find.text(AppStrings.labelServiceRequested), findsOneWidget);
-      expect(find.text('GENERAL INSPECTION'), findsOneWidget);
-      expect(find.text(AppStrings.labelGenerator), findsNothing);
+      expect(find.text(AppStrings.labelServiceDescriptionSummary), findsOneWidget);
+      expect(find.text('General inspection before weekend'), findsOneWidget);
+      expect(find.text(AppStrings.labelGeneratorSummary), findsNothing);
       expect(find.text(AppStrings.labelNotes), findsNothing);
     });
 
@@ -4322,6 +4305,13 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(GeneratorScreen), findsOneWidget);
+
+      // Fill required description
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintGeneratorServiceDescription),
+        'Need regular servicing',
+      );
+      await tester.pumpAndSettle();
 
       // Submit
       await tester.ensureVisible(find.text(AppStrings.actionRequestGenerator));

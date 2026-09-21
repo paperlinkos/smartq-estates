@@ -41,19 +41,16 @@ enum GeneratorRequestStatus {
   }
 }
 
-/// A structured model representing a resident's request for generator service.
+/// A structured model representing a resident's request for generator maintenance or repair.
 class GeneratorRequest {
   /// Unique request identifier (e.g. 'GEN-1710000000000').
   final String id;
 
-  /// The service type (e.g. 'ROUTINE SERVICING' or custom described service).
-  final String serviceType;
+  /// Detailed description of the service, maintenance, or issue needed.
+  final String serviceDescription;
 
-  /// Whether the service was custom-specified by the resident.
-  final bool isCustom;
-
-  /// Optional generator description (e.g. '5kVA Firman' or '20kVA Mikano Diesel').
-  final String? generator;
+  /// Optional generator type or model (e.g. '5kVA Firman' or '20kVA Mikano Soundproof Diesel').
+  final String? generatorModel;
 
   /// Timing preference selected by the resident.
   final GeneratorTiming timing;
@@ -75,9 +72,8 @@ class GeneratorRequest {
 
   const GeneratorRequest({
     required this.id,
-    required this.serviceType,
-    required this.isCustom,
-    this.generator,
+    required this.serviceDescription,
+    this.generatorModel,
     required this.timing,
     this.scheduledFor,
     required this.deliveryLocation,
@@ -88,9 +84,8 @@ class GeneratorRequest {
 
   /// Factory helper to create a new [GeneratorRequest] with generated defaults.
   factory GeneratorRequest.create({
-    required String serviceType,
-    bool isCustom = false,
-    String? generator,
+    required String serviceDescription,
+    String? generatorModel,
     required GeneratorTiming timing,
     DateTime? scheduledFor,
     String deliveryLocation = 'estateAddress',
@@ -99,16 +94,13 @@ class GeneratorRequest {
     DateTime? createdAt,
   }) {
     final now = createdAt ?? DateTime.now();
-    final cleanGenerator = generator?.trim();
+    final cleanModel = generatorModel?.trim();
     final cleanNotes = notes?.trim();
 
     return GeneratorRequest(
       id: 'GEN-${now.microsecondsSinceEpoch}',
-      serviceType: serviceType.trim(),
-      isCustom: isCustom,
-      generator: cleanGenerator != null && cleanGenerator.isNotEmpty
-          ? cleanGenerator
-          : null,
+      serviceDescription: serviceDescription.trim(),
+      generatorModel: cleanModel != null && cleanModel.isNotEmpty ? cleanModel : null,
       timing: timing,
       scheduledFor: scheduledFor,
       deliveryLocation: deliveryLocation,

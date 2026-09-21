@@ -47,8 +47,8 @@ class GeneratorRequestedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasGenerator =
-        request.generator != null && request.generator!.trim().isNotEmpty;
+    final hasGenerator = request.generatorModel != null &&
+        request.generatorModel!.trim().isNotEmpty;
     final hasNotes = request.notes != null && request.notes!.trim().isNotEmpty;
 
     return Scaffold(
@@ -91,26 +91,26 @@ class GeneratorRequestedScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // SERVICE REQUESTED
-                    _buildSectionHeader(AppStrings.labelServiceRequested),
+                    // SERVICE DESCRIPTION
+                    _buildSectionHeader(AppStrings.labelServiceDescriptionSummary),
                     const SizedBox(height: 6),
                     Text(
-                      request.serviceType,
+                      request.serviceDescription,
                       style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.3,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
                       ),
                     ),
 
                     if (hasGenerator) ...[
                       const Divider(height: 28),
                       // GENERATOR
-                      _buildSectionHeader(AppStrings.labelGenerator),
+                      _buildSectionHeader(AppStrings.labelGeneratorSummary),
                       const SizedBox(height: 6),
                       Text(
-                        request.generator!,
+                        request.generatorModel!,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 14.5,
