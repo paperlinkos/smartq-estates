@@ -43,8 +43,7 @@ import 'package:smartq_estates/core/models/access_record.dart';
 import 'package:smartq_estates/core/repositories/access_log_repository.dart';
 // Phase 6A imports
 import 'package:smartq_estates/screens/services/services_home_screen.dart';
-import 'package:smartq_estates/screens/services/service_placeholder_screens.dart'
-    as services_placeholders;
+
 // Phase 6B imports
 import 'package:smartq_estates/core/models/market_run_request.dart';
 import 'package:smartq_estates/core/repositories/market_run_repository.dart';
@@ -70,6 +69,12 @@ import 'package:smartq_estates/core/models/generator_request.dart';
 import 'package:smartq_estates/core/repositories/generator_repository.dart';
 import 'package:smartq_estates/screens/services/generator_screen.dart';
 import 'package:smartq_estates/screens/services/generator_requested_screen.dart';
+// Phase 6G imports
+import 'package:smartq_estates/core/models/maintenance_request.dart';
+import 'package:smartq_estates/core/repositories/maintenance_repository.dart';
+import 'package:smartq_estates/screens/services/maintenance_screen.dart';
+import 'package:smartq_estates/screens/services/maintenance_requested_screen.dart';
+
 
 
 
@@ -2115,30 +2120,6 @@ void main() {
         ),
       );
 
-      // Helper to test each service card navigation
-      Future<void> testCardNavigation(
-        String cardTitle,
-        Type expectedScreenType,
-      ) async {
-        await tester.ensureVisible(find.text(cardTitle));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(cardTitle));
-        await tester.pumpAndSettle();
-
-        expect(find.byType(expectedScreenType), findsOneWidget);
-        expect(find.text(cardTitle), findsWidgets);
-        expect(find.text(AppStrings.servicePlaceholderNotice), findsOneWidget);
-
-        // Pop back using the AppHeader back button of the top screen
-        final backButton = find.descendant(
-          of: find.byType(expectedScreenType),
-          matching: find.byIcon(Icons.arrow_back),
-        );
-        await tester.tap(backButton);
-        await tester.pumpAndSettle();
-        expect(find.byType(ServicesHomeScreen), findsOneWidget);
-      }
-
       // Market Run navigates to MarketRunScreen (Phase 6B)
       await tester.ensureVisible(find.text(AppStrings.marketRunTitle));
       await tester.pumpAndSettle();
@@ -2209,9 +2190,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
 
-      // Remaining 1 service navigates to placeholder screen
-      await testCardNavigation(AppStrings.maintenanceTitle,
-          services_placeholders.MaintenancePlaceholderScreen);
+      // Maintenance navigates to MaintenanceScreen (Phase 6G)
+      await tester.ensureVisible(find.text(AppStrings.maintenanceTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.maintenanceTitle));
+      await tester.pumpAndSettle();
+      expect(find.byType(MaintenanceScreen), findsOneWidget);
+      final maintenanceBackButton = find.descendant(
+        of: find.byType(MaintenanceScreen),
+        matching: find.byIcon(Icons.arrow_back),
+      );
+      await tester.tap(maintenanceBackButton);
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
 
     testWidgets('Back navigation from ServicesHomeScreen returns to previous screen',
@@ -4333,7 +4324,561 @@ void main() {
       expect(find.byType(ServicesHomeScreen), findsOneWidget);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SMARTQ ESTATES — PHASE 6G TESTS (MAINTENANCE REQUEST)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  group('SmartQ Estates - Phase 6G MaintenanceRequest Model Tests', () {
+    test('create with required fields generates defaults properly', () {
+      final now = DateTime(2026, 9, 21, 10, 0);
+      final request = MaintenanceRequest.create(
+        description: '  Kitchen faucet is leaking continuously  ',
+        timing: MaintenanceTiming.asSoonAsPossible,
+        createdAt: now,
+      );
+
+      expect(request.id, startsWith('MAINT-'));
+      expect(request.description, 'Kitchen faucet is leaking continuously');
+      expect(request.category, isNull);
+      expect(request.timing, MaintenanceTiming.asSoonAsPossible);
+      expect(request.scheduledFor, isNull);
+      expect(request.deliveryLocation, 'estateAddress');
+      expect(request.notes, isNull);
+      expect(request.status, MaintenanceRequestStatus.requested);
+      expect(request.createdAt, now);
+    });
+
+    test('create with optional category, notes, and scheduled date preserves trimmed values', () {
+      final scheduled = DateTime(2026, 9, 22, 14, 30);
+      final request = MaintenanceRequest.create(
+        description: 'Main breaker trips when AC is turned on',
+        category: '  ELECTRICAL  ',
+        timing: MaintenanceTiming.scheduled,
+        scheduledFor: scheduled,
+        notes: '  Gate key with security guard.  ',
+      );
+
+      expect(request.category, 'ELECTRICAL');
+      expect(request.timing, MaintenanceTiming.scheduled);
+      expect(request.scheduledFor, scheduled);
+      expect(request.notes, 'Gate key with security guard.');
+      expect(request.status, MaintenanceRequestStatus.requested);
+    });
+
+    test('create with empty or whitespace category and notes sets them to null', () {
+      final request = MaintenanceRequest.create(
+        description: 'Door lock is stuck',
+        category: '   ',
+        timing: MaintenanceTiming.laterToday,
+        notes: '   ',
+      );
+
+      expect(request.category, isNull);
+      expect(request.notes, isNull);
+    });
+
+    test('MaintenanceTiming display names are correct', () {
+      expect(MaintenanceTiming.asSoonAsPossible.displayName, 'AS SOON AS POSSIBLE');
+      expect(MaintenanceTiming.laterToday.displayName, 'LATER TODAY');
+      expect(MaintenanceTiming.scheduled.displayName, 'SCHEDULED');
+    });
+
+    test('MaintenanceRequestStatus display names are correct', () {
+      expect(MaintenanceRequestStatus.requested.displayName, 'REQUESTED');
+      expect(MaintenanceRequestStatus.assigned.displayName, 'ASSIGNED');
+      expect(MaintenanceRequestStatus.inProgress.displayName, 'IN PROGRESS');
+      expect(MaintenanceRequestStatus.completed.displayName, 'COMPLETED');
+      expect(MaintenanceRequestStatus.cancelled.displayName, 'CANCELLED');
+    });
+  });
+
+  group('SmartQ Estates - Phase 6G MaintenanceRepository Tests', () {
+    late LocalMaintenanceRepository repo;
+
+    setUp(() {
+      repo = LocalMaintenanceRepository.testInstance();
+    });
+
+    test('createRequest stores and returns the request', () {
+      final req = MaintenanceRequest.create(
+        description: 'Broken window latch',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      );
+
+      final returned = repo.createRequest(req);
+      expect(returned.id, req.id);
+      expect(repo.getRequests().length, 1);
+      expect(repo.getRequests().first.id, req.id);
+    });
+
+    test('getRequests returns requests sorted by createdAt descending', () {
+      final t1 = DateTime(2026, 9, 21, 8, 0);
+      final t2 = DateTime(2026, 9, 21, 9, 0);
+      final t3 = DateTime(2026, 9, 21, 10, 0);
+
+      repo.createRequest(MaintenanceRequest.create(
+        description: 'First req',
+        timing: MaintenanceTiming.asSoonAsPossible,
+        createdAt: t1,
+      ));
+      repo.createRequest(MaintenanceRequest.create(
+        description: 'Third req',
+        timing: MaintenanceTiming.asSoonAsPossible,
+        createdAt: t3,
+      ));
+      repo.createRequest(MaintenanceRequest.create(
+        description: 'Second req',
+        timing: MaintenanceTiming.asSoonAsPossible,
+        createdAt: t2,
+      ));
+
+      final requests = repo.getRequests();
+      expect(requests.length, 3);
+      expect(requests[0].description, 'Third req');
+      expect(requests[1].description, 'Second req');
+      expect(requests[2].description, 'First req');
+    });
+
+    test('getRequestById finds request or returns null', () {
+      final req = MaintenanceRequest.create(
+        description: 'AC not cooling',
+        category: 'AC / COOLING',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      );
+      repo.createRequest(req);
+
+      expect(repo.getRequestById(req.id)?.id, req.id);
+      expect(repo.getRequestById('NON_EXISTENT'), isNull);
+    });
+
+    test('clear empties the repository', () {
+      repo.createRequest(MaintenanceRequest.create(
+        description: 'Test req',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      ));
+      expect(repo.getRequests().length, 1);
+
+      repo.clear();
+      expect(repo.getRequests(), isEmpty);
+    });
+
+    test('testInstance returns isolated instances', () {
+      final repo1 = LocalMaintenanceRepository.testInstance();
+      final repo2 = LocalMaintenanceRepository.testInstance();
+
+      repo1.createRequest(MaintenanceRequest.create(
+        description: 'Only in repo1',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      ));
+
+      expect(repo1.getRequests().length, 1);
+      expect(repo2.getRequests().length, 0);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6G MaintenanceScreen Widget Tests', () {
+    late LocalMaintenanceRepository testRepo;
+
+    setUp(() {
+      testRepo = LocalMaintenanceRepository.testInstance();
+    });
+
+    testWidgets('Renders all initial UI elements properly',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+        ),
+      );
+
+      // Header
+      expect(find.text(AppStrings.maintenanceTitle), findsOneWidget);
+      expect(find.text(AppStrings.maintenanceHeaderSubtitle), findsOneWidget);
+
+      // Main question & subtitle
+      expect(find.text(AppStrings.maintenanceQuestion), findsOneWidget);
+      expect(find.text(AppStrings.maintenanceQuestionSubtitle), findsOneWidget);
+
+      // Description section & text field
+      expect(find.text(AppStrings.labelMaintenanceDescription), findsOneWidget);
+      expect(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription),
+        findsOneWidget,
+      );
+
+      // Category chips
+      expect(find.text(AppStrings.labelCategoryOptional), findsOneWidget);
+      expect(find.text('PLUMBING'), findsOneWidget);
+      expect(find.text('ELECTRICAL'), findsOneWidget);
+      expect(find.text('CARPENTRY'), findsOneWidget);
+      expect(find.text('AC / COOLING'), findsOneWidget);
+      expect(find.text('PAINTING'), findsOneWidget);
+      expect(find.text('OTHER'), findsOneWidget);
+
+      // Timing options
+      expect(find.text(AppStrings.timingHeading), findsOneWidget);
+      expect(find.text(AppStrings.timingAsap), findsOneWidget);
+      expect(find.text(AppStrings.timingLaterToday), findsOneWidget);
+      expect(find.text(AppStrings.timingSchedule), findsOneWidget);
+
+      // Deliver/service location
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes (optional)
+      expect(find.text(AppStrings.labelNotesOptional), findsOneWidget);
+      expect(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceNotes),
+        findsOneWidget,
+      );
+
+      // Submit button
+      expect(find.text(AppStrings.actionRequestMaintenance), findsOneWidget);
+    });
+
+    testWidgets('Shows error when submitting with empty description',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+        ),
+      );
+
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorMaintenanceDescriptionRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Clears description error when user enters text',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+        ),
+      );
+
+      // Trigger error
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      expect(find.text(AppStrings.errorMaintenanceDescriptionRequired), findsOneWidget);
+
+      // Type text
+      final descField =
+          find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription);
+      await tester.enterText(descField, 'Kitchen pipe is leaking');
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorMaintenanceDescriptionRequired), findsNothing);
+    });
+
+    testWidgets('Selecting category chip toggles selection on and off',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Tap PLUMBING
+      await tester.ensureVisible(find.text('PLUMBING'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PLUMBING'));
+      await tester.pumpAndSettle();
+
+      // Enter description and submit
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription),
+        'Leaking pipe under sink',
+      );
+      await tester.pumpAndSettle();
+
+      // Tap submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+
+      expect(testRepo.getRequests().first.category, 'PLUMBING');
+    });
+
+    testWidgets('Tapping the same category chip unselects it',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Tap ELECTRICAL then tap it again to unselect
+      await tester.ensureVisible(find.text('ELECTRICAL'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ELECTRICAL'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ELECTRICAL'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription),
+        'Issue with wall socket',
+      );
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+
+      expect(testRepo.getRequests().first.category, isNull);
+    });
+
+    testWidgets('Timing selection switches between ASAP, LATER TODAY, and SCHEDULE',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Initially ASAP is selected, no date/time pickers
+      expect(find.text('Select Date'), findsNothing);
+
+      // Tap LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      expect(find.text('Select Date'), findsNothing);
+
+      // Tap SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      expect(find.text('Select Date'), findsOneWidget);
+      expect(find.text('Select Time'), findsOneWidget);
+    });
+
+    testWidgets('Selecting SCHEDULE without picking date/time shows error upon submission',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription),
+        'Bedroom door hinges loose',
+      );
+      await tester.pumpAndSettle();
+
+      // Switch to SCHEDULE
+      await tester.ensureVisible(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingSchedule));
+      await tester.pumpAndSettle();
+
+      // Try to submit without picking date and time
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.errorScheduledRequired), findsOneWidget);
+      expect(testRepo.getRequests(), isEmpty);
+    });
+
+    testWidgets('Valid submission saves to repository and navigates to MaintenanceRequestedScreen',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceScreen(repository: testRepo),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Fill in description
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription),
+        'Repaint master bedroom ceiling and fix water stain',
+      );
+      await tester.pumpAndSettle();
+
+      // Select category
+      await tester.ensureVisible(find.text('PAINTING'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('PAINTING'));
+      await tester.pumpAndSettle();
+
+      // Select LATER TODAY
+      await tester.ensureVisible(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.timingLaterToday));
+      await tester.pumpAndSettle();
+
+      // Enter notes
+      await tester.ensureVisible(find.widgetWithText(TextField, AppStrings.hintMaintenanceNotes));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceNotes),
+        'Paint cans are already inside the store room.',
+      );
+      await tester.pumpAndSettle();
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+
+      // Verify stored in repo
+      expect(testRepo.getRequests().length, 1);
+      final stored = testRepo.getRequests().first;
+      expect(stored.description, 'Repaint master bedroom ceiling and fix water stain');
+      expect(stored.category, 'PAINTING');
+      expect(stored.timing, MaintenanceTiming.laterToday);
+      expect(stored.notes, 'Paint cans are already inside the store room.');
+
+      // Navigated to confirmation screen
+      expect(find.byType(MaintenanceRequestedScreen), findsOneWidget);
+    });
+  });
+
+  group('SmartQ Estates - Phase 6G MaintenanceRequestedScreen Tests', () {
+    testWidgets('Displays all request details when fully populated',
+        (WidgetTester tester) async {
+      final scheduled = DateTime(2026, 9, 25, 15, 30);
+      final request = MaintenanceRequest.create(
+        description: 'AC compressor is making loud rattling noise',
+        category: 'AC / COOLING',
+        timing: MaintenanceTiming.scheduled,
+        scheduledFor: scheduled,
+        notes: 'Security knows about the technician visit.',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceRequestedScreen(request: request),
+        ),
+      );
+
+      // Header
+      expect(find.text(AppStrings.requestReceivedTitle), findsOneWidget);
+      expect(find.text(AppStrings.maintenanceRequestReceivedSubtitle), findsOneWidget);
+
+      // Problem description
+      expect(find.text(AppStrings.labelDescriptionSummary), findsOneWidget);
+      expect(find.text('AC compressor is making loud rattling noise'), findsOneWidget);
+
+      // Category
+      expect(find.text(AppStrings.labelCategorySummary), findsOneWidget);
+      expect(find.text('AC / COOLING'), findsOneWidget);
+
+      // Timing
+      expect(find.text(AppStrings.labelWhen), findsOneWidget);
+      expect(find.text('25 Sep, 2026 · 3:30 PM'), findsOneWidget);
+
+      // Deliver to
+      expect(find.text(AppStrings.labelDeliverTo), findsOneWidget);
+      expect(find.text(AppStrings.myEstateAddress), findsOneWidget);
+
+      // Notes
+      expect(find.text(AppStrings.labelNotes), findsOneWidget);
+      expect(find.text('Security knows about the technician visit.'), findsOneWidget);
+
+      // Done button
+      expect(find.text(AppStrings.doneAction), findsOneWidget);
+    });
+
+    testWidgets('Does not display category or notes sections when they are null or empty',
+        (WidgetTester tester) async {
+      final request = MaintenanceRequest.create(
+        description: 'Fixing balcony door handle',
+        timing: MaintenanceTiming.asSoonAsPossible,
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MaintenanceRequestedScreen(request: request),
+        ),
+      );
+
+      expect(find.text(AppStrings.labelDescriptionSummary), findsOneWidget);
+      expect(find.text('Fixing balcony door handle'), findsOneWidget);
+      expect(find.text(AppStrings.labelCategorySummary), findsNothing);
+      expect(find.text(AppStrings.labelNotes), findsNothing);
+    });
+
+    testWidgets('DONE button returns to Services Home',
+        (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed(AppRouter.services),
+                child: const Text('GO TO SERVICES'),
+              ),
+            ),
+          ),
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
+      );
+
+      // Open ServicesHomeScreen with named route
+      await tester.tap(find.text('GO TO SERVICES'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+
+      // Navigate to MaintenanceScreen
+      await tester.ensureVisible(find.text(AppStrings.maintenanceTitle));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.maintenanceTitle));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MaintenanceScreen), findsOneWidget);
+
+      // Fill required description
+      await tester.enterText(
+        find.widgetWithText(TextField, AppStrings.hintMaintenanceDescription),
+        'Fix water heater switch',
+      );
+      await tester.pumpAndSettle();
+
+      // Submit
+      await tester.ensureVisible(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.actionRequestMaintenance));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(MaintenanceRequestedScreen), findsOneWidget);
+
+      // Tap DONE
+      await tester.ensureVisible(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(AppStrings.doneAction));
+      await tester.pumpAndSettle();
+
+      // Returns to ServicesHomeScreen
+      expect(find.byType(MaintenanceRequestedScreen), findsNothing);
+      expect(find.byType(MaintenanceScreen), findsNothing);
+      expect(find.byType(ServicesHomeScreen), findsOneWidget);
+    });
+  });
 }
+
 
 
 

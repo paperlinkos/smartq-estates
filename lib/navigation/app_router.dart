@@ -6,6 +6,7 @@ import '../core/models/event_pass.dart';
 import '../core/models/gas_request.dart';
 import '../core/models/generator_request.dart';
 import '../core/models/grocery_request.dart';
+import '../core/models/maintenance_request.dart';
 import '../core/models/market_run_request.dart';
 import '../core/models/petrol_request.dart';
 import '../core/models/visitor_pass.dart';
@@ -23,12 +24,13 @@ import '../screens/services/generator_screen.dart';
 import '../screens/services/generator_requested_screen.dart';
 import '../screens/services/groceries_screen.dart';
 import '../screens/services/groceries_requested_screen.dart';
+import '../screens/services/maintenance_screen.dart';
+import '../screens/services/maintenance_requested_screen.dart';
 import '../screens/services/market_run_screen.dart';
 import '../screens/services/market_run_requested_screen.dart';
 import '../screens/services/petrol_screen.dart';
 import '../screens/services/petrol_requested_screen.dart';
 import '../screens/services/services_home_screen.dart';
-import '../screens/services/service_placeholder_screens.dart' as services_placeholders;
 import '../screens/splash/splash_screen.dart';
 import '../screens/visitors/create_event_screen.dart';
 import '../screens/visitors/event_created_screen.dart';
@@ -52,7 +54,7 @@ class AppRouter {
   static const String maintenance = '/maintenance';
   static const String payments = '/payments';
 
-  // Services category routes (Phase 6A, 6B, 6C, 6D, 6E & 6F)
+  // Services category routes (Phase 6A, 6B, 6C, 6D, 6E, 6F & 6G)
   static const String marketRun = '/services/market-run';
   static const String marketRunRequested = '/services/market-run/requested';
   static const String groceries = '/services/groceries';
@@ -64,6 +66,8 @@ class AppRouter {
   static const String generator = '/services/generator';
   static const String generatorRequested = '/services/generator/requested';
   static const String serviceMaintenance = '/services/maintenance';
+  static const String serviceMaintenanceRequested =
+      '/services/maintenance/requested';
 
   // Visitors action routes
   static const String inviteSomeone = '/visitors/invite';
@@ -199,8 +203,13 @@ class AppRouter {
         );
       case serviceMaintenance:
         return MaterialPageRoute(
-          builder: (_) =>
-              const services_placeholders.MaintenancePlaceholderScreen(),
+          builder: (_) => const MaintenanceScreen(),
+          settings: settings,
+        );
+      case serviceMaintenanceRequested:
+        final request = settings.arguments as MaintenanceRequest;
+        return MaterialPageRoute(
+          builder: (_) => MaintenanceRequestedScreen(request: request),
           settings: settings,
         );
       case maintenance:

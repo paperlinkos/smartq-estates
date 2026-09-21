@@ -371,5 +371,27 @@ class AppStrings {
       'Please describe the generator service needed.';
   static const String labelServiceDescriptionSummary = 'SERVICE DESCRIPTION';
   static const String labelGeneratorSummary = 'GENERATOR';
+
+  // Phase 6G — Maintenance Request
+  static const String maintenanceHeaderSubtitle =
+      'REQUEST PROPERTY & HOME REPAIRS.';
+  static const String maintenanceQuestion = 'WHAT NEEDS FIXING?';
+  static const String maintenanceQuestionSubtitle =
+      'Describe the issue or repair you need in your home.';
+  static const String labelMaintenanceDescription = 'WHAT NEEDS ATTENTION';
+  static const String hintMaintenanceDescription =
+      'e.g. Leaking kitchen sink pipe, faulty bedroom socket, broken door lock...';
+  static const String labelCategoryOptional = 'CATEGORY (OPTIONAL)';
+  static const String hintCategory =
+      'e.g. Plumbing, Electrical, Carpentry, AC';
+  static const String hintMaintenanceNotes =
+      'Any special access instructions (e.g. Key with security, call before entering)...';
+  static const String actionRequestMaintenance = 'REQUEST MAINTENANCE';
+  static const String maintenanceRequestReceivedSubtitle =
+      "We've received your maintenance request.";
+  static const String errorMaintenanceDescriptionRequired =
+      'Please describe what needs fixing.';
+  static const String labelCategorySummary = 'CATEGORY';
+  static const String labelDescriptionSummary = 'WHAT NEEDS FIXING';
 }
 
